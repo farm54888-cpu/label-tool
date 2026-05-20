@@ -1,0 +1,1726 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>標籤列印工具 55×40mm｜TSC TDP-225</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#e4e1dc;--surface:#fff;--dark:#1a1a1a;
+  --red:#c0392b;--muted:#888;--blue:#2980b9;
+}
+body{font-family:'Microsoft JhengHei','微軟正黑體','Noto Sans TC',sans-serif;
+  background:var(--bg);padding:16px;color:var(--dark);font-size:13px;}
+h1{font-size:14px;font-weight:900;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border-radius:3px;font-family:monospace;}
+
+.main{display:grid;grid-template-columns:250px 1fr;gap:16px;align-items:start;}
+
+/* ── Panel ── */
+.panel{background:#fff;border:1.5px solid #ccc;border-radius:6px;padding:12px;
+  max-height:calc(100vh - 80px);overflow-y:auto;}
+.ptitle{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;
+  color:var(--muted);padding-bottom:7px;border-bottom:1px solid #eee;margin-bottom:9px;}
+.sec{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;
+  color:var(--red);margin:9px 0 5px;display:flex;align-items:center;gap:4px;}
+.sec::before{content:'';width:3px;height:10px;background:var(--red);border-radius:2px;display:inline-block;}
+.fg{margin-bottom:6px;}
+.fg label{display:block;font-size:9px;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;}
+.fg input[type=text]{width:100%;padding:4px 7px;border:1.5px solid #d5d5d5;
+  border-radius:4px;font-family:inherit;font-size:12px;background:#fafaf8;outline:none;}
+.fg input[type=text]:focus{border-color:var(--dark);}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+
+/* selected element info */
+.sel-info{background:#f0f7ff;border:1px solid #b8d4f0;border-radius:4px;
+  padding:8px 10px;margin-bottom:8px;font-size:10px;line-height:1.7;}
+.sel-info strong{color:var(--blue);}
+.sel-info .no-sel{color:var(--muted);font-style:italic;}
+
+/* per-element compact sliders */
+.el-row{border:1px solid #ebebeb;border-radius:4px;padding:6px 8px;margin-bottom:5px;
+  background:#fafaf8;cursor:pointer;transition:border-color .15s;}
+.el-row:hover{border-color:#bbb;}
+.el-row.active{border-color:var(--red);background:#fff8f7;}
+.el-row .el-head{display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:4px;}
+.el-row .el-name{font-size:10px;font-weight:700;display:flex;align-items:center;gap:5px;}
+.el-row .el-name .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.sl-grid{display:grid;grid-template-columns:42px 1fr 30px;gap:2px 6px;align-items:center;}
+.sl-lbl{font-size:8.5px;color:var(--muted);font-weight:700;}
+.sl-grid input[type=range]{width:100%;height:12px;cursor:pointer;accent-color:var(--red);}
+.sl-num{font-size:9px;font-weight:700;text-align:right;}
+
+/* visibility toggle */
+.vis-btn{font-size:10px;background:none;border:1px solid #ccc;border-radius:3px;
+  padding:1px 5px;cursor:pointer;color:var(--muted);}
+.vis-btn.hidden{background:#fee;border-color:#f99;color:#c00;}
+
+.btn-print{width:100%;margin-top:10px;padding:8px;
+  background:var(--dark);color:#fff;border:none;border-radius:4px;
+  font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;}
+.btn-print:hover{background:#000;}
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;}
+.btn-sec{padding:7px;background:#f5f5f5;border:1.5px solid #ccc;border-radius:4px;
+  font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;}
+.btn-sec:hover{background:#eee;}
+.hint{margin-top:7px;font-size:9.5px;color:var(--muted);line-height:1.6;}
+.saved-notice{font-size:9.5px;color:green;margin-top:4px;display:none;}
+
+/* ── Preview ── */
+.preview-wrap{display:flex;flex-direction:column;align-items:flex-start;gap:6px;}
+.preview-lbl{font-size:9.5px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.12em;color:var(--muted);}
+
+/* Shell = 550×400px = 55mm×40mm at 10px/mm */
+.label-shell{
+  width:550px;height:400px;background:#fff;
+  border:2px solid #aaa;box-shadow:0 4px 18px rgba(0,0,0,.12);
+  position:relative;overflow:hidden;cursor:default;
+  /* grid background for alignment reference */
+  background-image:
+    linear-gradient(rgba(41,128,185,.07) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(41,128,185,.07) 1px,transparent 1px);
+  background-size:55px 40px; /* 5.5mm × 4mm grid */
+}
+
+/* guideline overlays */
+.guideline{position:absolute;pointer-events:none;z-index:100;}
+.guideline.h{width:100%;height:1px;background:rgba(41,128,185,.5);left:0;}
+.guideline.v{height:100%;width:1px;background:rgba(41,128,185,.5);top:0;}
+
+/* ── Draggable element wrapper ── */
+.lel{
+  position:absolute;
+  user-select:none;
+  z-index:1;
+}
+.lel .inner{
+  position:relative;
+  display:inline-block;
+  cursor:grab;
+  min-width:10px;min-height:8px;
+}
+.lel .inner:active{cursor:grabbing;}
+.lel.selected{z-index:50;}
+.lel.selected .inner{
+  outline:1.5px dashed var(--red);
+  outline-offset:2px;
+}
+/* resize handle – bottom-right corner */
+.lel.selected .resize-handle{
+  display:block;
+}
+.resize-handle{
+  display:none;
+  position:absolute;
+  right:-5px;bottom:-5px;
+  width:12px;height:12px;
+  background:var(--red);
+  border:2px solid #fff;
+  border-radius:2px;
+  cursor:se-resize;
+  z-index:10;
+}
+/* barcode left/right width handles */
+.bc-drag-handle{
+  display:none;
+  position:absolute;
+  top:0; bottom:0;
+  width:10px;
+  background:var(--blue);
+  opacity:0.75;
+  border:2px solid #fff;
+  border-radius:3px;
+  cursor:ew-resize;
+  z-index:10;
+  align-items:center;
+  justify-content:center;
+}
+.bc-drag-handle::after{
+  content:'⋮';
+  color:#fff;
+  font-size:10px;
+  line-height:1;
+}
+.bc-drag-handle.bc-left { left:-6px; }
+.bc-drag-handle.bc-right{ right:-6px; }
+.lel.selected .bc-drag-handle{ display:flex; }
+
+/* Element content styles */
+#c-title{font-weight:900;color:#000;white-space:nowrap;}
+#c-line1,#c-line2,#c-line3,#c-line4{font-weight:400;color:#111;white-space:nowrap;}
+#c-price{font-weight:900;color:#000;white-space:nowrap;}
+#c-unit{font-weight:700;color:#000;white-space:nowrap;}
+#c-prefix{
+  font-family:'Microsoft JhengHei','微軟正黑體','Noto Sans TC',sans-serif;font-weight:700;
+  border:2.5px solid #111;
+  display:flex;align-items:center;justify-content:center;
+  white-space:nowrap;
+}
+/* barcode container */
+#c-barcode{display:block;line-height:1;}
+#c-barcode svg{display:block;}
+
+/* ── Cloud Sync ── */
+.sync-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:5px 9px;border-radius:4px;margin-bottom:6px;
+  font-size:10px;font-weight:700;gap:6px;
+  background:#f0f7ff;border:1px solid #b8d4f0;
+}
+.sync-status{display:flex;align-items:center;gap:5px;color:#2980b9;}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:#ccc;flex-shrink:0;}
+.sync-dot.ok{background:#27ae60;}
+.sync-dot.err{background:#e74c3c;}
+.sync-dot.ing{background:#f39c12;animation:pulse .8s infinite alternate;}
+@keyframes pulse{from{opacity:.3}to{opacity:1}}
+.sync-btn{padding:2px 7px;border:1px solid #2980b9;border-radius:3px;
+  background:#fff;color:#2980b9;font-size:9.5px;font-weight:700;cursor:pointer;}
+.sync-btn:hover{background:#eaf3fb;}
+.sync-setup{
+  background:#fff8e1;border:1px solid #f0d080;border-radius:5px;
+  padding:9px 10px;margin-bottom:8px;font-size:10.5px;line-height:1.7;color:#7a5c00;
+}
+.sync-setup input{
+  width:100%;padding:4px 7px;border:1.5px solid #ddb;border-radius:3px;
+  font-family:monospace;font-size:11px;margin-top:3px;outline:none;
+}
+.sync-setup .save-url-btn{
+  margin-top:5px;padding:4px 12px;background:#1a1a1a;color:#fff;
+  border:none;border-radius:3px;font-family:inherit;font-size:11px;
+  font-weight:700;cursor:pointer;
+}
+
+/* ── DB Modal ── */
+.modal-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);
+  z-index:1000;align-items:center;justify-content:center;
+}
+.modal-overlay.open{display:flex;}
+.modal-box{
+  background:#fff;border-radius:8px;padding:20px;
+  width:520px;max-height:80vh;display:flex;flex-direction:column;
+  box-shadow:0 8px 32px rgba(0,0,0,.25);
+}
+.modal-box h2{font-size:14px;font-weight:900;margin-bottom:12px;
+  display:flex;align-items:center;justify-content:space-between;}
+.modal-box h2 .close-btn{
+  background:none;border:none;font-size:18px;cursor:pointer;color:#888;
+  line-height:1;padding:0 4px;
+}
+.db-search{
+  width:100%;padding:6px 9px;border:1.5px solid #ddd;border-radius:4px;
+  font-family:inherit;font-size:12px;margin-bottom:10px;outline:none;
+}
+.db-search:focus{border-color:#333;}
+.db-list{flex:1;overflow-y:auto;border:1px solid #eee;border-radius:4px;}
+.db-item{
+  display:grid;grid-template-columns:1fr auto;
+  padding:8px 10px;border-bottom:1px solid #f0f0f0;
+  cursor:pointer;transition:background .1s;gap:6px;
+  align-items:center;
+}
+.db-item:hover{background:#f5f5f5;}
+.db-item:last-child{border-bottom:none;}
+.db-item .db-name{font-size:13px;font-weight:700;color:#111;}
+.db-item .db-sub{font-size:10px;color:#888;margin-top:1px;}
+.db-item .db-actions{display:flex;gap:4px;flex-shrink:0;}
+.db-btn{padding:3px 7px;border:1px solid #ddd;border-radius:3px;
+  font-size:10px;cursor:pointer;background:#fff;font-family:inherit;}
+.db-btn.edit{border-color:#2980b9;color:#2980b9;}
+.db-btn.del{border-color:#e74c3c;color:#e74c3c;}
+.db-btn.use{border-color:#27ae60;color:#27ae60;font-weight:700;}
+.db-btn:hover{opacity:.75;}
+.db-form{
+  margin-top:12px;padding:12px;background:#f9f9f9;
+  border:1px solid #e0e0e0;border-radius:6px;
+}
+.db-form .df{margin-bottom:7px;}
+.db-form label{display:block;font-size:9.5px;font-weight:700;
+  color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;}
+.db-form input{width:100%;padding:5px 8px;border:1.5px solid #ddd;
+  border-radius:4px;font-family:inherit;font-size:12px;outline:none;}
+.db-form input:focus{border-color:#333;}
+.df-row2{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.db-form-btns{display:flex;gap:6px;margin-top:8px;}
+.db-form-btns button{flex:1;padding:6px;border:none;border-radius:4px;
+  font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;}
+.db-save-btn{background:#1a1a1a;color:#fff;}
+.db-cancel-btn{background:#eee;color:#333;}
+.db-add-row{padding:8px 10px;text-align:center;}
+.db-add-row button{
+  width:100%;padding:6px;border:1.5px dashed #bbb;border-radius:4px;
+  background:none;font-family:inherit;font-size:12px;
+  color:#888;cursor:pointer;
+}
+.db-add-row button:hover{border-color:#333;color:#333;}
+.db-empty{padding:20px;text-align:center;color:#aaa;font-size:12px;}
+
+.btn-db{
+  width:100%;margin-bottom:6px;padding:7px;
+  background:#8e44ad;color:#fff;border:none;border-radius:4px;
+  font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;
+}
+.btn-db:hover{background:#7d3c98;}
+
+
+/* ── Print ── */
+@media print{
+  @page{size:55mm 40mm;margin:0;}
+  html,body{
+    width:55mm!important;height:40mm!important;
+    overflow:hidden!important;
+    padding:0!important;margin:0!important;
+    background:#fff!important;
+  }
+  body>h1,.main>.panel,.preview-lbl,.resize-handle,
+  .guideline{display:none!important;}
+  .main{display:block!important;width:55mm!important;height:40mm!important;}
+  .preview-wrap{display:block!important;width:55mm!important;height:40mm!important;}
+  .label-shell{
+    position:fixed!important;
+    top:0!important;left:0!important;
+    width:550px!important;height:400px!important;
+    border:none!important;box-shadow:none!important;
+    background-image:none!important;
+    transform:scale(0.378)!important;
+    transform-origin:top left!important;
+    overflow:hidden!important;
+  }
+  .lel.selected .inner{outline:none!important;}
+}
+</style>
+</head>
+<body>
+
+<h1>標籤列印工具 <span class="badge">55×40mm · TSC TDP-225</span></h1>
+
+<div class="main">
+<!-- ── LEFT ── -->
+<div class="panel">
+  <div class="ptitle">標籤內容</div>
+
+  <!-- Cloud sync bar -->
+  <div class="sync-bar" id="sync-bar" style="display:none;">
+    <div class="sync-status">
+      <div class="sync-dot" id="sync-dot"></div>
+      <span id="sync-status-text">未連線</span>
+    </div>
+    <button class="sync-btn" onclick="forcSync()">↺ 立即同步</button>
+  </div>
+  <div class="sync-setup" id="sync-setup">
+    ☁️ 填入 Apps Script 網址以啟用雲端同步：
+    <input type="text" id="gas-url-input" placeholder="https://script.google.com/macros/s/.../exec">
+    <button class="save-url-btn" onclick="saveGasUrl()">連線</button>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">
+    <button class="btn-db" onclick="openDB()" style="margin-bottom:0;">📦 品項資料庫</button>
+    <button class="btn-db" onclick="saveCurrentToDB()" style="background:#27ae60;margin-bottom:0;">💾 存入資料庫</button>
+  </div>
+  <button class="btn-print" onclick="window.print()" style="margin-top:0;margin-bottom:6px;">🖨 列印標籤</button>
+
+  <div class="fg"><label>主標題</label>
+    <input type="text" id="f-title" value="夏南瓜（櫛瓜）"></div>
+  <div class="fg"><label>第一行</label>
+    <input type="text" id="f-line1" value="夏南瓜（櫛瓜）250g/袋"></div>
+  <div class="fg"><label>第二行</label>
+    <input type="text" id="f-line2" value="農民：林建良"></div>
+  <div class="fg"><label>第三行</label>
+    <input type="text" id="f-line3" value="產地：南投"></div>
+  <div class="fg"><label>第四行（選填）</label>
+    <input type="text" id="f-line4" value=""></div>
+  <div class="row2">
+    <div class="fg"><label>價格</label>
+      <input type="text" id="f-price" value="46" oninput="autoCalcBarcode()"></div>
+    <div class="fg"><label>單位</label>
+      <input type="text" id="f-unit" value="元"></div>
+  </div>
+  <!-- 前置號碼 = 今年第幾天，可 ±2 天調整 -->
+  <div style="background:#f9f6ff;border:1.5px solid #d5c5f0;border-radius:5px;padding:9px 10px;margin-bottom:8px;">
+    <div style="font-size:10px;font-weight:700;color:#8e44ad;text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px;">
+      📅 前置號碼（包裝日 / 今年第幾天）
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">
+      <button onclick="adjustDay(-1)" id="btn-day-minus"
+        style="width:28px;height:28px;border:1.5px solid #bbb;border-radius:4px;
+        background:#fff;font-size:16px;cursor:pointer;line-height:1;font-weight:700;"
+        title="前一天">−</button>
+      <div style="flex:1;text-align:center;">
+        <div style="font-size:22px;font-weight:900;color:#8e44ad;line-height:1;" id="day-number">117</div>
+        <div style="font-size:10px;color:#888;margin-top:1px;" id="day-date">今天</div>
+      </div>
+      <button onclick="adjustDay(1)" id="btn-day-plus"
+        style="width:28px;height:28px;border:1.5px solid #bbb;border-radius:4px;
+        background:#fff;font-size:16px;cursor:pointer;line-height:1;font-weight:700;"
+        title="後一天">+</button>
+    </div>
+    <div style="font-size:9.5px;color:#888;text-align:center;" id="day-limit-hint">
+      最多可調整 +2 天
+    </div>
+  </div>
+  <input type="hidden" id="f-prefix" value="97">
+
+  <!-- 條碼自動計算區 -->
+  <div style="background:#f0f7ff;border:1.5px solid #b8d4f0;border-radius:5px;padding:9px 10px;margin-bottom:8px;">
+    <div style="font-size:10px;font-weight:700;color:#2980b9;text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px;">
+      🔢 條碼自動計算（26 + 貨號 + 廠編 + 檢核 + 價格 + 檢核）
+    </div>
+    <div class="row2" style="margin-bottom:6px;">
+      <div class="fg" style="margin-bottom:0;">
+        <label>產品貨號（6碼）</label>
+        <input type="text" id="bc-product" maxlength="6" placeholder="982079"
+          oninput="this.value=this.value.replace(/\D/g,'');autoCalcBarcode()">
+      </div>
+      <div class="fg" style="margin-bottom:0;">
+        <label>農友廠編（4碼，固定）</label>
+        <input type="text" id="bc-farmer" maxlength="4" value="4509"
+          style="background:#f5f5f5;color:#888;"
+          oninput="this.value=this.value.replace(/\D/g,'');autoCalcBarcode()">
+      </div>
+    </div>
+    <div style="font-size:9.5px;color:#555;margin-bottom:5px;">
+      ※ 價格欄位填寫後自動計算，或可手動輸入條碼數值
+    </div>
+    <div id="bc-preview" style="font-size:10px;font-family:'Courier New',monospace;
+      background:#fff;border:1px solid #ccc;border-radius:3px;
+      padding:4px 7px;color:#333;min-height:22px;letter-spacing:.05em;"></div>
+  </div>
+
+  <div class="fg"><label>條碼數值（可手動覆蓋）</label>
+    <input type="text" id="f-barcode" value="2698207945095003"></div>
+
+  <div class="sec">元素位置 &amp; 大小</div>
+  <div class="sel-info" id="sel-info">
+    <span class="no-sel">點選預覽中的元素來選取，<br>或點下方列表</span>
+  </div>
+  <div id="el-list"></div>
+
+  <div class="btn-row">
+    <button class="btn-sec" onclick="saveLayout()">💾 儲存版面</button>
+    <button class="btn-sec" onclick="resetLayout()">↺ 重置</button>
+  </div>
+  <div class="saved-notice" id="saved-notice">✅ 版面已儲存！</div>
+  <div class="hint">列印：紙張 <strong>55×40mm</strong>、邊距「無」、縮放「100%」、關閉頁首頁尾<br>
+    💾 版面會在關閉視窗後自動記憶</div>
+</div>
+
+<!-- ── RIGHT ── -->
+<div class="preview-wrap">
+  <div class="preview-lbl">預覽 — 拖曳移動・角落拖曳縮放・自動對齊基準線</div>
+  <div class="label-shell" id="shell">
+    <!-- guidelines injected by JS -->
+    <div class="lel" id="el-title">
+      <div class="inner" id="c-title">夏南瓜（櫛瓜）</div>
+      <div class="resize-handle" data-id="el-title"></div>
+    </div>
+    <div class="lel" id="el-line1">
+      <div class="inner" id="c-line1">夏南瓜（櫛瓜）250g/袋</div>
+      <div class="resize-handle" data-id="el-line1"></div>
+    </div>
+    <div class="lel" id="el-line2">
+      <div class="inner" id="c-line2">農民：林建良</div>
+      <div class="resize-handle" data-id="el-line2"></div>
+    </div>
+    <div class="lel" id="el-line3">
+      <div class="inner" id="c-line3">產地：南投</div>
+      <div class="resize-handle" data-id="el-line3"></div>
+    </div>
+    <div class="lel" id="el-line4">
+      <div class="inner" id="c-line4"></div>
+      <div class="resize-handle" data-id="el-line4"></div>
+    </div>
+    <div class="lel" id="el-price">
+      <div class="inner" id="c-price">46</div>
+      <div class="resize-handle" data-id="el-price"></div>
+    </div>
+    <div class="lel" id="el-unit">
+      <div class="inner" id="c-unit">元</div>
+      <div class="resize-handle" data-id="el-unit"></div>
+    </div>
+    <div class="lel" id="el-prefix">
+      <div class="inner" id="c-prefix">97</div>
+      <div class="resize-handle" data-id="el-prefix"></div>
+    </div>
+    <div class="lel" id="el-barcode">
+      <div class="bc-drag-handle bc-left"  data-id="el-barcode" data-dir="left"></div>
+      <div class="inner" id="c-barcode">
+        <svg xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+      <div class="bc-drag-handle bc-right" data-id="el-barcode" data-dir="right"></div>
+      <div class="resize-handle" data-id="el-barcode"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// CODE128 Auto (C for pure digits, B for mixed) SVG renderer
+// ═══════════════════════════════════════════════════════════
+const BC=(()=>{
+  const P=['11011001100','11001101100','11001100110','10010011000','10010001100',
+    '10001001100','10011001000','10011000100','10001100100','11001001000',
+    '11001000100','11000100100','10110011100','10011011100','10011001110',
+    '10111001100','10011101100','10011100110','11001110010','11001011100',
+    '11001001110','11011100100','11001110100','11101101110','11101001100',
+    '11100101100','11100100110','11101100100','11100110100','11100110010',
+    '11011011000','11011000110','11000110110','10100011000','10001011000',
+    '10001000110','10110001000','10001101000','10001100010','11010001000',
+    '11000101000','11000100010','10110111000','10110001110','10001101110',
+    '10111011000','10111000110','10001110110','11101110110','11010001110',
+    '11000101110','11011101000','11011100010','11011101110','11101011000',
+    '11101000110','11100010110','11101101000','11101100010','11100011010',
+    '11101111010','11001000010','11110001010','10100110000','10100001100',
+    '10010110000','10010000110','10000101100','10000100110','10110010000',
+    '10110000100','10011010000','10011000010','10000110100','10000110010',
+    '11000010010','11001010000','11110111010','11000010100','10001111010',
+    '10100111100','10010111100','10010011110','10111100100','10011110100',
+    '10011110010','11110100100','11110010100','11110010010','11011011110',
+    '11011110110','11110110110','10101111000','10100011110','10001011110',
+    '10111101000','10111100010','11110101000','11110100010','10111011110',
+    '10111101110','11101011110','11110101110','11010000100','11010010000',
+    '11010011100','1100011101011'];
+  function enc(t){
+    // Auto-select CODE128C (pure even-length digits) or CODE128B
+    const isAllDigits = /^\d+$/.test(t);
+    const useC = isAllDigits && t.length % 2 === 0;
+
+    if(useC){
+      // CODE128C: START_C=105, pairs of digits encoded as values 0-99
+      const c=[105]; let k=105;
+      for(let i=0;i<t.length;i+=2){
+        const v=parseInt(t.substr(i,2),10);
+        c.push(v); k+=v*((i/2)+1);
+      }
+      c.push(k%103, 106);
+      return c.map(x=>P[x]).join('');
+    } else {
+      // CODE128B: START_B=104
+      const c=[104]; let k=104;
+      for(let i=0;i<t.length;i++){
+        const v=t.charCodeAt(i)-32;
+        if(v<0||v>94) throw 'bad';
+        c.push(v); k+=v*(i+1);
+      }
+      c.push(k%103, 106);
+      return c.map(x=>P[x]).join('');
+    }
+  }
+  // barH : bar height px
+  // barU  : bar unit width px (controls density — wider = looser)
+  // numSize: font size for number text below
+  // barH     : bar height px
+  // fixedW   : total fixed width px (barcode never exceeds this)
+  // density  : 0.1~1.0, controls black bar width ratio within each slot
+  //            1.0 = bars fill slot fully (dense)
+  //            0.5 = bars are half slot width (loose/airy)
+  // numSize  : font size for number text
+  // fontFamily: font for number text
+  function render(svgEl, text, barH, density, numSize, fontFamily){
+    const PAD=6;
+    let bits;
+    try{bits=enc(text);}catch(e){
+      svgEl.setAttribute('viewBox','0 0 80 20');
+      svgEl.removeAttribute('width'); svgEl.removeAttribute('height');
+      svgEl.style.width='200px'; svgEl.style.height='20px';
+      svgEl.innerHTML='<text x="4" y="14" font-size="10" fill="red">條碼錯誤</text>';
+      return;
+    }
+
+    // Group consecutive bits into runs
+    const runs=[];
+    let cur=bits[0], len=1;
+    for(let i=1;i<bits.length;i++){
+      if(bits[i]===cur) len++;
+      else{ runs.push({v:cur,n:len}); cur=bits[i]; len=1; }
+    }
+    runs.push({v:cur,n:len});
+
+    // Fixed total width: use stored bw value from S
+    const id='el-barcode';
+    const fixedW = (window.S&&window.S[id]&&window.S[id].bw) ? window.S[id].bw : 500;
+    const innerW = fixedW - PAD*2;
+    // slot width = innerW / total bits
+    const slotW  = innerW / bits.length;
+    // density 0.1~1.0: black bar width = slotW * density
+    const d      = Math.min(1.0, Math.max(0.1, density||0.8));
+    const barW   = slotW * d;
+
+    const ns=numSize||10;
+    const H=barH+ns+6;
+
+    svgEl.setAttribute('viewBox',`0 0 ${fixedW} ${H}`);
+    svgEl.setAttribute('width',  fixedW+'px');
+    svgEl.setAttribute('height', H+'px');
+    svgEl.style.width  = fixedW+'px';
+    svgEl.style.height = H+'px';
+    svgEl.removeAttribute('preserveAspectRatio');
+
+    let s=`<rect width="${fixedW}" height="${H}" fill="white"/>`;
+    let x=PAD;
+    for(const run of runs){
+      const totalSlotW = run.n * slotW;
+      if(run.v==='1'){
+        // Centre the black bar within the slot group
+        const gap = (totalSlotW - run.n*barW) / 2;
+        s+=`<rect x="${x+gap}" y="0" width="${run.n*barW}" height="${barH}" fill="black"/>`;
+      }
+      x+=totalSlotW;
+    }
+
+    const ff=fontFamily||"'Microsoft JhengHei','微軟正黑體','Noto Sans TC',sans-serif";
+    s+=`<text x="${fixedW-PAD}" y="${H-1}"
+      font-family="${ff}"
+      font-size="${ns}" text-anchor="end" fill="black">${text}</text>`;
+    svgEl.innerHTML=s;
+  }
+  return{render};
+})();
+
+// ═══════════════════════════════════════════════════════════
+// Default layout (550×400 shell coords)
+// ═══════════════════════════════════════════════════════════
+const DEFAULTS = {
+  'el-title':  {x:11,  y:0,   fs:60, vis:true},
+  'el-line1':  {x:13,  y:82,  fs:30, vis:true},
+  'el-line2':  {x:13,  y:124, fs:30, vis:true},
+  'el-line3':  {x:13,  y:166, fs:30, vis:true},
+  'el-line4':  {x:8,   y:104, fs:14, vis:true},
+  'el-price':  {x:386, y:117, fs:80, vis:true},
+  'el-unit':   {x:486, y:166, fs:33, vis:true},
+  'el-prefix': {x:20,  y:337, fs:31, vis:true, pw:61, ph:50},
+  'el-barcode':{x:13,  y:229, fs:16, bd:0.8, bw:500, bh:48, vis:true},
+};
+
+const META = {
+  'el-title':  {label:'主標題',    color:'#e74c3c', fsMin:12, fsMax:60},
+  'el-line1':  {label:'第一行',    color:'#8e44ad', fsMin:8,  fsMax:60},
+  'el-line2':  {label:'第二行',    color:'#2980b9', fsMin:8,  fsMax:60},
+  'el-line3':  {label:'第三行',    color:'#27ae60', fsMin:8,  fsMax:60},
+  'el-line4':  {label:'第四行',    color:'#f39c12', fsMin:8,  fsMax:60},
+  'el-price':  {label:'價格',      color:'#e74c3c', fsMin:30, fsMax:120},
+  'el-unit':   {label:'單位',      color:'#16a085', fsMin:10, fsMax:50},
+  'el-prefix': {label:'前置方框',  color:'#7f8c8d', fsMin:10, fsMax:40, hasPW:true, hasPH:true},
+  'el-barcode':{label:'條碼',      color:'#2c3e50', fsMin:6,  fsMax:40, hasBD:true, hasBW:true, hasBH:true},
+};
+
+// current layout state
+let S = {}; window.S = S;
+
+function loadState(){
+  try{
+    const saved = localStorage.getItem('label_layout_v9');
+    if(saved) S = JSON.parse(saved);
+    else S = JSON.parse(JSON.stringify(DEFAULTS));
+  }catch(e){ S = JSON.parse(JSON.stringify(DEFAULTS)); }
+  // ensure all keys exist
+  Object.keys(DEFAULTS).forEach(k=>{
+    if(!S[k]) S[k]=JSON.parse(JSON.stringify(DEFAULTS[k]));
+  });
+}
+
+function saveLayout(){
+  localStorage.setItem('label_layout_v9', JSON.stringify(S));
+  const n = document.getElementById('saved-notice');
+  n.style.display='block';
+  setTimeout(()=>n.style.display='none', 2000);
+}
+
+function resetLayout(){
+  if(!confirm('確定要重置為預設版面嗎？')) return;
+  S = JSON.parse(JSON.stringify(DEFAULTS));
+  applyAll();
+  updateAllSliders();
+  renderBarcode();
+  saveLayout();
+}
+
+// ═══════════════════════════════════════════════════════════
+// Apply state to DOM
+// ═══════════════════════════════════════════════════════════
+function applyEl(id){
+  const el = document.getElementById(id);
+  const s  = S[id];
+  if(!el||!s) return;
+  el.style.left    = s.x+'px';
+  el.style.top     = s.y+'px';
+  el.style.display = s.vis===false ? 'none' : '';
+
+  if(id==='el-prefix'){
+    const c = document.getElementById('c-prefix');
+    c.style.fontSize = s.fs+'px';
+    c.style.width    = s.pw+'px';
+    c.style.height   = s.ph+'px';
+  } else if(id==='el-barcode'){
+    const svg = document.querySelector('#c-barcode svg');
+    const ns  = s.fs||10;
+    BC.render(svg,
+      document.getElementById('f-barcode').value.trim(),
+      s.bh, s.bu||1.5, ns,
+      "'Microsoft JhengHei','微軟正黑體','Noto Sans TC',sans-serif");
+  } else {
+    const inner = el.querySelector('.inner');
+    if(inner) inner.style.fontSize = s.fs+'px';
+  }
+}
+
+function applyAll(){ Object.keys(S).forEach(applyEl); }
+
+function renderBarcode(){
+  const id  = 'el-barcode';
+  const s   = S[id];
+  const svg = document.querySelector('#c-barcode svg');
+  BC.render(svg,
+    document.getElementById('f-barcode').value.trim(),
+    s.bh, s.bd||0.8, s.fs||10,
+    "'Microsoft JhengHei','微軟正黑體','Noto Sans TC',sans-serif");
+
+  // Sync S to window.S
+  if(window.S) window.S[id] = s;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Build sidebar element list
+// ═══════════════════════════════════════════════════════════
+let selectedId = null;
+
+function buildList(){
+  const list = document.getElementById('el-list');
+  list.innerHTML='';
+  Object.keys(META).forEach(id=>{
+    const m = META[id];
+    const s = S[id];
+    const row = document.createElement('div');
+    row.className='el-row';
+    row.id='row-'+id;
+
+    // head
+    const head = document.createElement('div');
+    head.className='el-head';
+    head.innerHTML=`<div class="el-name">
+      <span class="dot" style="background:${m.color}"></span>${m.label}
+    </div>`;
+    const vBtn = document.createElement('button');
+    vBtn.className='vis-btn'+(s.vis===false?' hidden':'');
+    vBtn.textContent=s.vis===false?'隱藏':'顯示';
+    vBtn.onclick=(e)=>{e.stopPropagation(); toggleVis(id);};
+    head.appendChild(vBtn);
+    row.appendChild(head);
+
+    // sliders
+    const sg = document.createElement('div');
+    sg.className='sl-grid';
+
+    function addSlider(lbl, key, min, max, val, onChange){
+      const lb=document.createElement('span');lb.className='sl-lbl';lb.textContent=lbl;
+      const sl=document.createElement('input');sl.type='range';
+      sl.min=min;sl.max=max;sl.value=val;sl.id=`sl-${id}-${key}`;
+      const nm=document.createElement('span');nm.className='sl-num';nm.id=`nm-${id}-${key}`;nm.textContent=val;
+      sl.oninput=()=>{nm.textContent=sl.value;onChange(parseInt(sl.value));};
+      sg.appendChild(lb);sg.appendChild(sl);sg.appendChild(nm);
+    }
+
+    addSlider('X', 'x', 0, 540, s.x, v=>{S[id].x=v;document.getElementById(id).style.left=v+'px';});
+    addSlider('Y', 'y', 0, 390, s.y, v=>{S[id].y=v;document.getElementById(id).style.top=v+'px';});
+    addSlider('大小','fs', m.fsMin, m.fsMax, s.fs, v=>{
+      S[id].fs=v;
+      if(id==='el-prefix'){document.getElementById('c-prefix').style.fontSize=v+'px';}
+      else if(id==='el-barcode'){renderBarcode();}
+      else{const inn=document.getElementById(id).querySelector('.inner');if(inn)inn.style.fontSize=v+'px';}
+    });
+    if(m.hasPW) addSlider('框寬','pw', 20, 150, s.pw, v=>{S[id].pw=v;document.getElementById('c-prefix').style.width=v+'px';});
+    if(m.hasPH) addSlider('框高','ph', 20, 150, s.ph, v=>{S[id].ph=v;document.getElementById('c-prefix').style.height=v+'px';});
+    if(m.hasBD) addSlider('條密度','bd', 1, 10, Math.round((s.bd||0.8)*10), v=>{S[id].bd=v/10;renderBarcode();});
+    if(m.hasBW) addSlider('條碼寬','bw', 100, 540, s.bw||500, v=>{S[id].bw=v;if(window.S)window.S[id].bw=v;renderBarcode();});
+    if(m.hasBH) addSlider('條高','bh', 15, 120, s.bh, v=>{S[id].bh=v;renderBarcode();});
+
+    row.appendChild(sg);
+
+    row.onclick=()=>selectEl(id);
+    list.appendChild(row);
+  });
+}
+
+function updateAllSliders(){
+  Object.keys(META).forEach(id=>{
+    const s=S[id];
+    ['x','y','fs','pw','ph','bh'].forEach(k=>{
+      const sl=document.getElementById(`sl-${id}-${k}`);
+      const nm=document.getElementById(`nm-${id}-${k}`);
+      if(sl&&s[k]!=null){sl.value=s[k];nm.textContent=s[k];}
+    });
+    // bd is stored as float 0.1~1.0, slider shows *10
+    if(s.bd!=null){
+      const sl=document.getElementById(`sl-${id}-bd`);
+      const nm=document.getElementById(`nm-${id}-bd`);
+      if(sl){ const v=Math.round(s.bd*10); sl.value=v; nm.textContent=v; }
+    }
+  });
+}
+
+let zCounter = 10;
+function selectEl(id){
+  // deselect previous
+  document.querySelectorAll('.lel').forEach(e=>e.classList.remove('selected'));
+  document.querySelectorAll('.el-row').forEach(e=>e.classList.remove('active'));
+  if(selectedId===id){ selectedId=null; updateSelInfo(null); return; }
+  selectedId=id;
+  const el=document.getElementById(id);
+  if(el){
+    el.classList.add('selected');
+    zCounter++;
+    el.style.zIndex=zCounter;
+  }
+  document.getElementById('row-'+id)?.classList.add('active');
+  document.getElementById('row-'+id)?.scrollIntoView({block:'nearest'});
+  updateSelInfo(id);
+}
+
+function updateSelInfo(id){
+  const box=document.getElementById('sel-info');
+  if(!id){box.innerHTML='<span class="no-sel">點選預覽中的元素來選取，<br>或點下方列表</span>';return;}
+  const m=META[id];const s=S[id];
+  box.innerHTML=`<strong style="color:${m.color}">● ${m.label}</strong><br>
+    X: ${Math.round(s.x)} &nbsp; Y: ${Math.round(s.y)} &nbsp; 大小: ${s.fs}`;
+}
+
+function toggleVis(id){
+  S[id].vis=!(S[id].vis!==false);
+  document.getElementById(id).style.display=S[id].vis?'':'none';
+  const btn=document.querySelector(`#row-${id} .vis-btn`);
+  btn.textContent=S[id].vis?'顯示':'隱藏';
+  btn.className='vis-btn'+(S[id].vis?'':' hidden');
+}
+
+// ═══════════════════════════════════════════════════════════
+// Guidelines (snap lines)
+// ═══════════════════════════════════════════════════════════
+const SNAP = 10; // snap threshold px
+const GUIDE_IDS={h:[],v:[]};
+
+function showGuideline(axis, pos){
+  const shell=document.getElementById('shell');
+  const id='gl-'+axis+'-'+pos;
+  if(document.getElementById(id)) return;
+  const d=document.createElement('div');
+  d.className='guideline '+(axis==='h'?'h':'v');
+  d.id=id;
+  if(axis==='h') d.style.top=pos+'px';
+  else d.style.left=pos+'px';
+  shell.appendChild(d);
+  GUIDE_IDS[axis].push(id);
+}
+function clearGuidelines(){
+  [...GUIDE_IDS.h,...GUIDE_IDS.v].forEach(id=>document.getElementById(id)?.remove());
+  GUIDE_IDS.h=[];GUIDE_IDS.v=[];
+}
+
+// snap positions: edges and centers of all elements + shell edges/center
+function getSnapPositions(excludeId){
+  const shell=document.getElementById('shell');
+  const sx=550,sy=400;
+  const xs=new Set([0,sx/2,sx]);
+  const ys=new Set([0,sy/2,sy]);
+  Object.keys(S).forEach(id=>{
+    if(id===excludeId) return;
+    const el=document.getElementById(id);
+    if(!el||S[id].vis===false) return;
+    const r=el.getBoundingClientRect();
+    const sr=shell.getBoundingClientRect();
+    const ex=r.left-sr.left, ey=r.top-sr.top;
+    const ew=r.width, eh=r.height;
+    xs.add(ex); xs.add(ex+ew/2); xs.add(ex+ew);
+    ys.add(ey); ys.add(ey+eh/2); ys.add(ey+eh);
+  });
+  return{xs:[...xs],ys:[...ys]};
+}
+
+function trySnap(val, candidates){
+  for(const c of candidates){
+    if(Math.abs(val-c)<=SNAP) return{snapped:true,val:c};
+  }
+  return{snapped:false,val};
+}
+
+// ═══════════════════════════════════════════════════════════
+// Drag & Resize interaction
+// ═══════════════════════════════════════════════════════════
+let dragState=null; // {type:'move'|'resize', id, ox,oy, sx,sy, origW,origH, origFS}
+
+document.querySelectorAll('.lel .inner').forEach(inner=>{
+  inner.addEventListener('mousedown',e=>{
+    if(e.target.classList.contains('resize-handle')) return;
+    const lel=inner.closest('.lel');
+    const id=lel.id;
+    selectEl(id);
+    const sr=document.getElementById('shell').getBoundingClientRect();
+    dragState={
+      type:'move', id,
+      ox:e.clientX-S[id].x-sr.left,
+      oy:e.clientY-S[id].y-sr.top,
+    };
+    e.preventDefault();
+  });
+});
+
+document.querySelectorAll('.resize-handle').forEach(h=>{
+  h.addEventListener('mousedown',e=>{
+    const id=h.dataset.id;
+    selectEl(id);
+    const el=document.getElementById(id);
+    const inner=el.querySelector('.inner');
+    dragState={
+      type:'resize', id,
+      ox:e.clientX, oy:e.clientY,
+      origFS: S[id].fs||14,
+      origW:  el.offsetWidth,
+      origH:  el.offsetHeight,
+      origBH: S[id].bh||50,
+      origPW: S[id].pw||46,
+      origPH: S[id].ph||50,
+    };
+    e.preventDefault();
+    e.stopPropagation();
+  });
+});
+
+// Barcode left/right width drag handles
+document.querySelectorAll('.bc-drag-handle').forEach(h=>{
+  h.addEventListener('mousedown',e=>{
+    const id=h.dataset.id;
+    const dir=h.dataset.dir; // 'left' or 'right'
+    selectEl(id);
+    const svg=document.querySelector('#c-barcode svg');
+    dragState={
+      type:'bc-width', id, dir,
+      ox:e.clientX,
+      origBU: S[id].bu||1.5,
+      origX:  S[id].x,
+      // bits count for width calculation
+      bitsLen: svg ? parseInt(svg.getAttribute('viewBox')?.split(' ')[2]||'400') : 400,
+    };
+    e.preventDefault();
+    e.stopPropagation();
+  });
+});
+
+document.addEventListener('mousemove',e=>{
+  if(!dragState) return;
+  const shell=document.getElementById('shell');
+  const sr=shell.getBoundingClientRect();
+
+  if(dragState.type==='move'){
+    const id=dragState.id;
+    const el=document.getElementById(id);
+    let nx=e.clientX-sr.left-dragState.ox;
+    let ny=e.clientY-sr.top -dragState.oy;
+    // clamp
+    nx=Math.max(0,Math.min(nx,550-el.offsetWidth));
+    ny=Math.max(0,Math.min(ny,400-el.offsetHeight));
+
+    // snap
+    clearGuidelines();
+    const {xs,ys}=getSnapPositions(id);
+    const snapX=trySnap(nx,xs);
+    const snapX2=trySnap(nx+el.offsetWidth,xs);
+    const snapXc=trySnap(nx+el.offsetWidth/2,xs);
+    const snapY=trySnap(ny,ys);
+    const snapY2=trySnap(ny+el.offsetHeight,ys);
+    const snapYc=trySnap(ny+el.offsetHeight/2,ys);
+
+    if(snapX.snapped)        { nx=snapX.val;          showGuideline('v',nx); }
+    else if(snapX2.snapped)  { nx=snapX2.val-el.offsetWidth; showGuideline('v',snapX2.val); }
+    else if(snapXc.snapped)  { nx=snapXc.val-el.offsetWidth/2; showGuideline('v',snapXc.val); }
+    if(snapY.snapped)        { ny=snapY.val;           showGuideline('h',ny); }
+    else if(snapY2.snapped)  { ny=snapY2.val-el.offsetHeight; showGuideline('h',snapY2.val); }
+    else if(snapYc.snapped)  { ny=snapYc.val-el.offsetHeight/2; showGuideline('h',snapYc.val); }
+
+    S[id].x=nx; S[id].y=ny;
+    el.style.left=nx+'px'; el.style.top=ny+'px';
+
+    // sync sliders
+    ['x','y'].forEach(k=>{
+      const sl=document.getElementById(`sl-${id}-${k}`);
+      const nm=document.getElementById(`nm-${id}-${k}`);
+      if(sl){sl.value=Math.round(S[id][k]);nm.textContent=Math.round(S[id][k]);}
+    });
+    updateSelInfo(id);
+
+  } else if(dragState.type==='bc-width'){
+    const id=dragState.id;
+    const dx=e.clientX-dragState.ox;
+    // Each pixel drag changes bar unit by 0.01
+    // right handle: drag right = wider; left handle: drag left = wider
+    const delta = dragState.dir==='right' ? dx : -dx;
+    const newBU = Math.max(0.5, Math.min(5.0, dragState.origBU + delta*0.02));
+    S[id].bu = Math.round(newBU*100)/100;
+    renderBarcode();
+    // If left handle, adjust X position so right edge stays fixed
+    if(dragState.dir==='left'){
+      const svg=document.querySelector('#c-barcode svg');
+      const newW=svg?svg.offsetWidth:0;
+      // We'll just let position stay; user can nudge if needed
+    }
+    // sync slider (bu slider shows *10)
+    const sl=document.getElementById(`sl-${id}-bu`);
+    const nm=document.getElementById(`nm-${id}-bu`);
+    if(sl){ const v=Math.round(S[id].bu*10); sl.value=v; nm.textContent=v; }
+
+  } else if(dragState.type==='resize'){
+    const id=dragState.id;
+    const dx=e.clientX-dragState.ox;
+    const dy=e.clientY-dragState.oy;
+
+    if(id==='el-barcode'){
+      const m=META[id];
+      const nh=Math.max(m.fsMin,Math.min(120,dragState.origBH+dy));
+      S[id].bh=Math.round(nh);
+      renderBarcode();
+      ['bh'].forEach(k=>{
+        const sl=document.getElementById(`sl-${id}-${k}`);
+        const nm=document.getElementById(`nm-${id}-${k}`);
+        if(sl){sl.value=S[id][k];nm.textContent=S[id][k];}
+      });
+    } else if(id==='el-prefix'){
+      const nw=Math.max(20,Math.min(150,dragState.origPW+dx));
+      const nh=Math.max(20,Math.min(150,dragState.origPH+dy));
+      S[id].pw=Math.round(nw); S[id].ph=Math.round(nh);
+      document.getElementById('c-prefix').style.width=nw+'px';
+      document.getElementById('c-prefix').style.height=nh+'px';
+      ['pw','ph'].forEach(k=>{
+        const sl=document.getElementById(`sl-${id}-${k}`);
+        const nm=document.getElementById(`nm-${id}-${k}`);
+        if(sl){sl.value=S[id][k];nm.textContent=S[id][k];}
+      });
+    } else {
+      // font size resize
+      const m=META[id];
+      const scale=(dragState.origW+dx)/Math.max(dragState.origW,1);
+      const nfs=Math.max(m.fsMin,Math.min(m.fsMax,Math.round(dragState.origFS*scale)));
+      S[id].fs=nfs;
+      const inner=document.getElementById(id).querySelector('.inner');
+      if(inner) inner.style.fontSize=nfs+'px';
+      const sl=document.getElementById(`sl-${id}-fs`);
+      const nm=document.getElementById(`nm-${id}-fs`);
+      if(sl){sl.value=nfs;nm.textContent=nfs;}
+      updateSelInfo(id);
+    }
+  }
+});
+
+document.addEventListener('mouseup',()=>{
+  if(dragState){
+    clearGuidelines();
+    dragState=null;
+    // auto-save
+    localStorage.setItem('label_layout_v9',JSON.stringify(S));
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
+// Content sync
+// ═══════════════════════════════════════════════════════════
+function syncContent(){
+  document.getElementById('c-title').textContent  = document.getElementById('f-title').value;
+  document.getElementById('c-line1').textContent  = document.getElementById('f-line1').value;
+  document.getElementById('c-line2').textContent  = document.getElementById('f-line2').value;
+  document.getElementById('c-line3').textContent  = document.getElementById('f-line3').value;
+  document.getElementById('c-line4').textContent  = document.getElementById('f-line4').value;
+  document.getElementById('c-price').textContent  = document.getElementById('f-price').value;
+  document.getElementById('c-unit').textContent   = document.getElementById('f-unit').value;
+  document.getElementById('c-prefix').textContent = document.getElementById('f-prefix').value;
+  // also save content
+  const content={
+    title:document.getElementById('f-title').value,
+    line1:document.getElementById('f-line1').value,
+    line2:document.getElementById('f-line2').value,
+    line3:document.getElementById('f-line3').value,
+    line4:document.getElementById('f-line4').value,
+    price:document.getElementById('f-price').value,
+    unit:document.getElementById('f-unit').value,
+    prefix:document.getElementById('f-prefix').value,
+    barcode:document.getElementById('f-barcode').value,
+  };
+  content.bcProduct = document.getElementById('bc-product')?.value||'';
+  content.bcFarmer  = document.getElementById('bc-farmer')?.value||'';
+  localStorage.setItem('label_content_v9',JSON.stringify(content));
+}
+function loadContent(){
+  try{
+    const saved=localStorage.getItem('label_content_v9');
+    if(!saved) return;
+    const c=JSON.parse(saved);
+    if(c.title)  document.getElementById('f-title').value=c.title;
+    if(c.line1)  document.getElementById('f-line1').value=c.line1;
+    if(c.line2)  document.getElementById('f-line2').value=c.line2;
+    if(c.line3)  document.getElementById('f-line3').value=c.line3;
+    if(c.line4)  document.getElementById('f-line4').value=c.line4;
+    if(c.price)  document.getElementById('f-price').value=c.price;
+    if(c.unit)   document.getElementById('f-unit').value=c.unit;
+    if(c.prefix) document.getElementById('f-prefix').value=c.prefix;
+    if(c.barcode) document.getElementById('f-barcode').value=c.barcode;
+    if(c.bcProduct && document.getElementById('bc-product'))
+      document.getElementById('bc-product').value=c.bcProduct;
+    if(c.bcFarmer && document.getElementById('bc-farmer'))
+      document.getElementById('bc-farmer').value=c.bcFarmer;
+  }catch(e){}
+}
+
+['f-title','f-line1','f-line2','f-line3','f-line4',
+ 'f-price','f-unit','f-prefix'].forEach(id=>
+  document.getElementById(id).addEventListener('input',syncContent));
+document.getElementById('f-barcode').addEventListener('input',()=>{
+  syncContent(); renderBarcode();
+});
+
+// ═══════════════════════════════════════════════════════════
+// Click on shell to select element
+// ═══════════════════════════════════════════════════════════
+document.getElementById('shell').addEventListener('mousedown',e=>{
+  const lel=e.target.closest('.lel');
+  if(!lel) { selectEl(null); clearGuidelines(); }
+});
+
+// ═══════════════════════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════════════════════
+loadState();
+loadContent();
+buildList();
+syncContent();
+applyAll();
+renderBarcode();
+// Set initial z-index order: prefix on top of barcode by default
+(function(){
+  const order=['el-title','el-line1','el-line2','el-line3','el-line4',
+               'el-price','el-unit','el-barcode','el-prefix'];
+  order.forEach((id,i)=>{
+    const el=document.getElementById(id);
+    if(el) el.style.zIndex=i+1;
+  });
+})();
+</script>
+
+<!-- ── DB Modal ── -->
+<div class="modal-overlay" id="db-modal">
+  <div class="modal-box">
+    <h2>📦 品項資料庫
+      <button class="close-btn" onclick="closeDB()">✕</button>
+    </h2>
+    <input class="db-search" id="db-search" placeholder="搜尋品項名稱…" oninput="renderDBList()">
+    <div class="db-list" id="db-list"></div>
+    <div class="db-add-row">
+      <button onclick="startAddDB()">＋ 新增品項</button>
+    </div>
+    <div class="db-form" id="db-form" style="display:none">
+      <div class="df"><label>主標題</label>
+        <input type="text" id="dbf-title" placeholder="夏南瓜（櫛瓜）"></div>
+      <div class="df"><label>第一行</label>
+        <input type="text" id="dbf-line1" placeholder="夏南瓜（櫛瓜）250g/袋"></div>
+      <div class="df"><label>第二行</label>
+        <input type="text" id="dbf-line2" placeholder="農民：林建良"></div>
+      <div class="df"><label>第三行</label>
+        <input type="text" id="dbf-line3" placeholder="產地：南投"></div>
+      <div class="df-row2">
+        <div class="df"><label>產品貨號（6碼）</label>
+          <input type="text" id="dbf-product" placeholder="982079" maxlength="6"
+            oninput="this.value=this.value.replace(/[^0-9]/g,'');dbfAutoCalc()"></div>
+        <div class="df"><label>農友廠編（固定）</label>
+          <input type="text" id="dbf-farmer" value="4509" maxlength="4"
+            style="background:#f5f5f5;color:#888;"
+            oninput="this.value=this.value.replace(/[^0-9]/g,'');dbfAutoCalc()"></div>
+      </div>
+      <div class="df-row2">
+        <div class="df"><label>價格</label>
+          <input type="text" id="dbf-price" placeholder="46"
+            oninput="dbfAutoCalc()"></div>
+        <div class="df"><label>條碼數值（自動帶入）</label>
+          <input type="text" id="dbf-barcode" placeholder="自動計算" style="background:#f5f5f5;"></div>
+      </div>
+      <div class="db-form-btns">
+        <button class="db-save-btn" onclick="saveDBItem()">儲存品項</button>
+        <button class="db-cancel-btn" onclick="cancelDBForm()">取消</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// Product Database
+// ═══════════════════════════════════════════════════════════
+const DB_KEY = 'label_product_db_v1';
+let dbItems = [];
+let dbEditIndex = -1; // -1 = new
+
+function loadDB(){
+  try{
+    const s = localStorage.getItem(DB_KEY);
+    dbItems = s ? JSON.parse(s) : [];
+  }catch(e){ dbItems=[]; }
+  // Add default sample if empty
+  if(dbItems.length===0){
+    dbItems=[{
+      title:'夏南瓜（櫛瓜）',
+      line1:'夏南瓜（櫛瓜）250g/袋',
+      line2:'農民：林建良',
+      line3:'產地：南投',
+      price:'46',
+      barcode:'2698207945095003'
+    }];
+    saveDB();
+  }
+}
+
+function saveDB(){
+  localStorage.setItem(DB_KEY, JSON.stringify(dbItems));
+}
+
+function openDB(){
+  renderDBList();
+  document.getElementById('db-modal').classList.add('open');
+  cancelDBForm();
+}
+function closeDB(){
+  document.getElementById('db-modal').classList.remove('open');
+}
+
+function renderDBList(){
+  const q = document.getElementById('db-search').value.toLowerCase();
+  const list = document.getElementById('db-list');
+  const filtered = dbItems.map((it,i)=>({...it,_i:i}))
+    .filter(it=>it.title.toLowerCase().includes(q)||
+                (it.line1||'').toLowerCase().includes(q));
+
+  if(filtered.length===0){
+    list.innerHTML='<div class="db-empty">找不到品項，請新增</div>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(it=>{
+    const priceTag = it.price
+      ? ' <span style="color:#c0392b;font-size:11px;font-weight:700;">'+it.price+'元</span>'
+      : '';
+    const productTag = it.product
+      ? ' <span style="color:#888;font-size:10px;font-weight:400;">貨號:'+it.product+'</span>'
+      : '';
+    const subText = [it.line1,it.line2,it.line3].filter(Boolean).join('・');
+    return `<div class="db-item">
+      <div>
+        <div class="db-name">${it.title}`+priceTag+productTag+`</div>
+        <div class="db-sub">`+subText+`</div>
+      </div>
+      <div class="db-actions">
+        <button class="db-btn use" onclick="useDBItem(${it._i})">套用</button>
+        <button class="db-btn edit" onclick="editDBItem(${it._i})">編輯</button>
+        <button class="db-btn del" onclick="delDBItem(${it._i})">刪除</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function useDBItem(i){
+  const it = dbItems[i];
+  document.getElementById('f-title').value  = it.title||'';
+  document.getElementById('f-line1').value  = it.line1||'';
+  document.getElementById('f-line2').value  = it.line2||'';
+  document.getElementById('f-line3').value  = it.line3||'';
+  document.getElementById('f-price').value  = it.price||'';
+  document.getElementById('f-barcode').value= it.barcode||'';
+  if(it.product) document.getElementById('bc-product').value = it.product;
+  if(it.farmer)  document.getElementById('bc-farmer').value  = it.farmer||'4509';
+  syncContent();
+  renderBarcode();
+  autoCalcBarcode();
+  closeDB();
+}
+
+function editDBItem(i){
+  dbEditIndex = i;
+  const it = dbItems[i];
+  document.getElementById('dbf-title').value   = it.title||'';
+  document.getElementById('dbf-line1').value   = it.line1||'';
+  document.getElementById('dbf-line2').value   = it.line2||'';
+  document.getElementById('dbf-line3').value   = it.line3||'';
+  document.getElementById('dbf-product').value = it.product||'';
+  document.getElementById('dbf-farmer').value  = it.farmer||'4509';
+  document.getElementById('dbf-price').value   = it.price||'';
+  document.getElementById('dbf-barcode').value = it.barcode||'';
+  document.getElementById('db-form').style.display='block';
+}
+
+function delDBItem(i){
+  if(!confirm(`確定刪除「${dbItems[i].title}」？`)) return;
+  dbItems.splice(i,1);
+  saveDB();
+  renderDBList();
+}
+
+function startAddDB(){
+  dbEditIndex = -1;
+  document.getElementById('dbf-title').value  = '';
+  document.getElementById('dbf-line1').value  = '';
+  document.getElementById('dbf-line2').value  = '';
+  document.getElementById('dbf-line3').value  = '';
+  document.getElementById('dbf-price').value  = '';
+  document.getElementById('dbf-barcode').value= '';
+  document.getElementById('db-form').style.display='block';
+}
+
+// 快速將目前畫面資料存入資料庫
+function saveCurrentToDB(){
+  const item = {
+    title:   document.getElementById('f-title').value.trim(),
+    line1:   document.getElementById('f-line1').value.trim(),
+    line2:   document.getElementById('f-line2').value.trim(),
+    line3:   document.getElementById('f-line3').value.trim(),
+    product: document.getElementById('bc-product')?.value.trim()||'',
+    farmer:  document.getElementById('bc-farmer')?.value.trim()||'4509',
+    price:   document.getElementById('f-price').value.trim(),
+    barcode: document.getElementById('f-barcode').value.trim(),
+  };
+  if(!item.title){ alert('請先輸入主標題'); return; }
+  // Check duplicate
+  const dup = dbItems.findIndex(d=>d.title===item.title && d.barcode===item.barcode);
+  if(dup>=0){
+    if(!confirm(`「${item.title}」已存在，要覆蓋嗎？`)) return;
+    dbItems[dup]=item;
+  } else {
+    dbItems.push(item);
+  }
+  saveDB();
+  const n=document.getElementById('saved-notice');
+  n.textContent='✅ 已儲存至資料庫！';
+  n.style.display='block';
+  setTimeout(()=>{n.style.display='none';n.textContent='✅ 版面已儲存！';},2000);
+}
+
+function saveDBItem(){
+  const item = {
+    title:   document.getElementById('dbf-title').value.trim(),
+    line1:   document.getElementById('dbf-line1').value.trim(),
+    line2:   document.getElementById('dbf-line2').value.trim(),
+    line3:   document.getElementById('dbf-line3').value.trim(),
+    product: document.getElementById('dbf-product').value.trim(),
+    farmer:  document.getElementById('dbf-farmer').value.trim()||'4509',
+    price:   document.getElementById('dbf-price').value.trim(),
+    barcode: document.getElementById('dbf-barcode').value.trim(),
+  };
+  if(!item.title){ alert('請輸入主標題'); return; }
+  if(dbEditIndex>=0) dbItems[dbEditIndex]=item;
+  else dbItems.push(item);
+  saveDB();
+  renderDBList();
+  cancelDBForm();
+}
+
+function cancelDBForm(){
+  dbEditIndex=-1;
+  document.getElementById('db-form').style.display='none';
+}
+
+// Close modal on overlay click
+document.getElementById('db-modal').addEventListener('click',e=>{
+  if(e.target===document.getElementById('db-modal')) closeDB();
+});
+
+// ═══════════════════════════════════════════════════════════
+// Day-of-year prefix logic
+// ═══════════════════════════════════════════════════════════
+let dayOffset = 0; // 0=today, 1=tomorrow, 2=day after
+
+function getDayOfYear(date) {
+  const start = new Date(date.getFullYear(), 0, 0);
+  const diff  = date - start;
+  const oneDay= 1000*60*60*24;
+  return Math.floor(diff / oneDay);
+}
+
+function updateDayDisplay() {
+  const today   = new Date();
+  const todayDOY= getDayOfYear(today);
+  const maxOffset = 2;
+
+  // Clamp offset
+  dayOffset = Math.max(0, Math.min(dayOffset, maxOffset));
+
+  const target = new Date(today);
+  target.setDate(today.getDate() + dayOffset);
+  const doy = getDayOfYear(target);
+
+  // Update hidden prefix input
+  document.getElementById('f-prefix').value = doy;
+
+  // Update display
+  document.getElementById('day-number').textContent = doy;
+  const dateStr = target.toLocaleDateString('zh-TW',{month:'numeric',day:'numeric'});
+  const label   = dayOffset===0 ? '今天 '+dateStr : (dayOffset===1?'明天':'後天')+' '+dateStr;
+  document.getElementById('day-date').textContent = label;
+
+  // Button states
+  document.getElementById('btn-day-minus').disabled = dayOffset <= 0;
+  document.getElementById('btn-day-minus').style.opacity = dayOffset<=0 ? '0.3' : '1';
+  document.getElementById('btn-day-plus').disabled  = dayOffset >= maxOffset;
+  document.getElementById('btn-day-plus').style.opacity  = dayOffset>=maxOffset ? '0.3' : '1';
+
+  // Hint
+  const remaining = maxOffset - dayOffset;
+  document.getElementById('day-limit-hint').textContent =
+    dayOffset===0 ? '最多可調整 +2 天' :
+    dayOffset===maxOffset ? '⚠️ 已達最大調整（+2天）' :
+    '還可再調 +'+(remaining)+'天';
+
+  // Sync to preview label
+  document.getElementById('c-prefix').textContent = doy;
+  syncContent();
+}
+
+function adjustDay(delta) {
+  dayOffset += delta;
+  updateDayDisplay();
+}
+
+// ── DB form auto calc ──
+function dbfAutoCalc() {
+  const product = (document.getElementById('dbf-product')?.value||'').trim();
+  const farmer  = (document.getElementById('dbf-farmer')?.value||'4509').trim();
+  const price   = (document.getElementById('dbf-price')?.value||'').trim();
+  const barcodeEl = document.getElementById('dbf-barcode');
+  if (!barcodeEl) return;
+
+  if (product.length===6 && farmer.length===4 && price && !isNaN(parseInt(price))) {
+    const code = calcBarcode(product, farmer, parseInt(price));
+    if (code) {
+      barcodeEl.value = code;
+      barcodeEl.style.background = '#f0fff0';
+      barcodeEl.style.color = '#1a7a1a';
+      barcodeEl.title = '自動計算：26+'+ product +'+'+ farmer +'+檢核+'+ String(parseInt(price)).padStart(4,'0') +'+檢核';
+    }
+  } else {
+    barcodeEl.style.background = '#f5f5f5';
+    barcodeEl.style.color = '#888';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Auto barcode calculation: 26 + product(6) + farmer(4) + chk1 + price(4) + chk2
+// ═══════════════════════════════════════════════════════════
+function eanCheck(digits, oddWeight3) {
+  let s = 0;
+  for (let i = 0; i < digits.length; i++) {
+    const w = oddWeight3 ? (i%2===0 ? 3 : 1) : (i%2===0 ? 1 : 3);
+    s += digits[i] * w;
+  }
+  return (10 - s % 10) % 10;
+}
+
+function calcBarcode(product6, farmer4, priceInt) {
+  if (product6.length !== 6 || farmer4.length !== 4) return null;
+  const base   = '26' + product6 + farmer4;           // 12 digits
+  const chk1   = eanCheck(base.split('').map(Number), false);
+  const price4 = String(priceInt).padStart(4, '0');
+  const before2= base + chk1 + price4;                // 17 digits
+  const chk2   = eanCheck(before2.split('').map(Number), true);
+  return before2 + chk2;                               // 18 digits
+}
+
+function autoCalcBarcode() {
+  const product = (document.getElementById('bc-product')?.value || '').trim();
+  const farmer  = (document.getElementById('bc-farmer')?.value  || '').trim();
+  const priceRaw= (document.getElementById('f-price')?.value    || '').trim();
+  const preview = document.getElementById('bc-preview');
+  const barcodeInput = document.getElementById('f-barcode');
+
+  if (!preview) return;
+
+  // Need all three fields
+  if (!product || !farmer || !priceRaw) {
+    const missing = [];
+    if (!product) missing.push('貨號');
+    if (!farmer)  missing.push('廠編');
+    if (!priceRaw)missing.push('價格');
+    preview.style.color = '#aaa';
+    preview.textContent = '尚未填寫：' + missing.join('、');
+    return;
+  }
+  if (product.length !== 6) {
+    preview.style.color = '#c00';
+    preview.textContent = '貨號需為 6 碼（目前 ' + product.length + ' 碼）';
+    return;
+  }
+  if (farmer.length !== 4) {
+    preview.style.color = '#c00';
+    preview.textContent = '廠編需為 4 碼（目前 ' + farmer.length + ' 碼）';
+    return;
+  }
+  const priceInt = parseInt(priceRaw);
+  if (isNaN(priceInt) || priceInt < 0 || priceInt > 9999) {
+    preview.style.color = '#c00';
+    preview.textContent = '價格需為 0～9999 的數字';
+    return;
+  }
+
+  const code = calcBarcode(product, farmer, priceInt);
+  if (!code) return;
+
+  // Format display: 26 | 982079 | 4509 | 5 | 0046 | 4
+  const disp = code.slice(0,2) +' '+ code.slice(2,8) +' '+ code.slice(8,12)
+             +' '+ code[12] +' '+ code.slice(13,17) +' '+ code[17];
+  preview.style.color = '#1a7a1a';
+  preview.innerHTML =
+    '<span style="color:#888">26</span> ' +
+    '<span style="color:#c0392b">' + code.slice(2,8) + '</span> ' +
+    '<span style="color:#2980b9">' + code.slice(8,12) + '</span> ' +
+    '<span style="color:#888">' + code[12] + '</span> ' +
+    '<span style="color:#8e44ad">' + code.slice(13,17) + '</span> ' +
+    '<span style="color:#888">' + code[17] + '</span>' +
+    ' <span style="color:#27ae60;font-size:9px;">✓ 自動帶入</span>';
+
+  // Auto-fill barcode input
+  barcodeInput.value = code;
+  // Trigger barcode render + content save
+  syncContent();
+  renderBarcode();
+}
+
+// Also save bc-product and bc-farmer to localStorage content
+const _origSyncContent = syncContent;
+// Patch saveCurrentToDB to include farmer/product if available
+const _origSaveCurrentToDB = saveCurrentToDB;
+
+// ================================================================
+// Cloud Sync — Google Apps Script bridge
+// ================================================================
+const GAS_URL_KEY = 'label_gas_url';
+// ★ 將下方網址換成你的 Apps Script 部署網址 ★
+const GAS_URL_HARDCODED = 'https://script.google.com/macros/s/AKfycbwuBHVErKSI9iPapSwLGTFnca72BZJRbS0XANSVB342l9Hje_ZSz9lL6WOblwWB_-jr/exec';
+let gasUrl = '';
+let syncTimer = null;
+let lastSyncTime = 0;
+
+function getGasUrl() {
+  if (GAS_URL_HARDCODED && GAS_URL_HARDCODED !== 'YOUR_GAS_URL_HERE')
+    return GAS_URL_HARDCODED;
+  return localStorage.getItem(GAS_URL_KEY) || '';
+}
+
+function saveGasUrl() {
+  const url = document.getElementById('gas-url-input').value.trim();
+  if (!url || !url.startsWith('https://script.google.com')) {
+    alert('請貼上正確的 Apps Script 部署網址\n（https://script.google.com/macros/s/.../exec）');
+    return;
+  }
+  localStorage.setItem(GAS_URL_KEY, url);
+  gasUrl = url;
+  initSync();
+}
+
+async function gasCall(action, body = {}) {
+  const url = getGasUrl();
+  if (!url) throw new Error('未設定 GAS URL');
+  const res = await fetch(url + '?action=' + action, {
+    method: 'POST',
+    body: JSON.stringify({ action, ...body }),
+  });
+  const data = await res.json();
+  if (!data.ok && data.error) throw new Error(data.error);
+  return data;
+}
+
+function setSyncStatus(state, text) {
+  const dot = document.getElementById('sync-dot');
+  const txt = document.getElementById('sync-status-text');
+  if (!dot) return;
+  dot.className = 'sync-dot ' + state;
+  txt.textContent = text;
+}
+
+async function syncProducts() {
+  try {
+    setSyncStatus('ing', '同步品項中…');
+    const data = await gasCall('products.list');
+    dbItems = data.items || [];
+    saveDB(); // also cache locally
+    renderDBList();
+    setSyncStatus('ok', '品項已同步 ' + new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}));
+  } catch(e) {
+    setSyncStatus('err', '同步失敗：' + e.message);
+  }
+}
+
+async function syncLayout() {
+  try {
+    const data = await gasCall('layout.get');
+    if (data.layout) {
+      const remote = JSON.parse(data.layout);
+      // Only apply if remote is newer (has updatedAt)
+      S = remote;
+      window.S = S;
+      applyAll();
+      updateAllSliders();
+      renderBarcode();
+    }
+  } catch(e) {
+    console.warn('Layout sync failed:', e.message);
+  }
+}
+
+async function pushLayout() {
+  const url = getGasUrl();
+  if (!url) return;
+  try {
+    await gasCall('layout.save', { layout: JSON.stringify(S) });
+  } catch(e) {
+    console.warn('Layout push failed:', e.message);
+  }
+}
+
+async function forcSync() {
+  await syncProducts();
+  await syncLayout();
+}
+
+// Cloud-aware DB operations
+async function cloudSaveItem(item) {
+  const url = getGasUrl();
+  if (!url) { saveDB(); return; }
+  try {
+    setSyncStatus('ing', '儲存中…');
+    const res = await gasCall('products.save', item);
+    if (res.id) item.id = res.id;
+    await syncProducts();
+  } catch(e) {
+    setSyncStatus('err', '儲存失敗');
+    saveDB();
+  }
+}
+
+async function cloudDeleteItem(id) {
+  const url = getGasUrl();
+  if (!url) return;
+  try {
+    setSyncStatus('ing', '刪除中…');
+    await gasCall('products.delete', { id });
+    await syncProducts();
+  } catch(e) {
+    setSyncStatus('err', '刪除失敗');
+  }
+}
+
+// Patch delDBItem to use cloud
+const _origDelDBItem = delDBItem;
+async function delDBItem(i) {
+  if (!confirm('確定刪除「' + dbItems[i].title + '」？')) return;
+  const item = dbItems[i];
+  const url = getGasUrl();
+  if (url && item.id) {
+    dbItems.splice(i, 1);
+    saveDB();
+    renderDBList();
+    await cloudDeleteItem(item.id);
+  } else {
+    dbItems.splice(i, 1);
+    saveDB();
+    renderDBList();
+  }
+}
+
+// Patch saveDBItem to use cloud
+const _origSaveDBItem = saveDBItem;
+async function saveDBItem() {
+  const item = {
+    id:      dbEditIndex >= 0 ? (dbItems[dbEditIndex].id || '') : '',
+    title:   document.getElementById('dbf-title').value.trim(),
+    line1:   document.getElementById('dbf-line1').value.trim(),
+    line2:   document.getElementById('dbf-line2').value.trim(),
+    line3:   document.getElementById('dbf-line3').value.trim(),
+    product: document.getElementById('dbf-product').value.trim(),
+    farmer:  document.getElementById('dbf-farmer').value.trim() || '4509',
+    price:   document.getElementById('dbf-price').value.trim(),
+    barcode: document.getElementById('dbf-barcode').value.trim(),
+  };
+  if (!item.title) { alert('請輸入主標題'); return; }
+  const url = getGasUrl();
+  if (url) {
+    cancelDBForm();
+    await cloudSaveItem(item);
+  } else {
+    if (dbEditIndex >= 0) dbItems[dbEditIndex] = item;
+    else dbItems.push(item);
+    saveDB();
+    renderDBList();
+    cancelDBForm();
+  }
+}
+
+// Patch saveCurrentToDB to use cloud
+const _origSaveCurrentToDB = saveCurrentToDB;
+async function saveCurrentToDB() {
+  const item = {
+    title:   document.getElementById('f-title').value.trim(),
+    line1:   document.getElementById('f-line1').value.trim(),
+    line2:   document.getElementById('f-line2').value.trim(),
+    line3:   document.getElementById('f-line3').value.trim(),
+    product: document.getElementById('bc-product')?.value.trim() || '',
+    farmer:  document.getElementById('bc-farmer')?.value.trim() || '4509',
+    price:   document.getElementById('f-price').value.trim(),
+    barcode: document.getElementById('f-barcode').value.trim(),
+  };
+  if (!item.title) { alert('請先輸入主標題'); return; }
+  const url = getGasUrl();
+  if (url) {
+    // Check duplicate by title+barcode
+    const dup = dbItems.findIndex(d => d.title === item.title && d.barcode === item.barcode);
+    if (dup >= 0) {
+      if (!confirm('「' + item.title + '」已存在，要覆蓋嗎？')) return;
+      item.id = dbItems[dup].id || '';
+    }
+    await cloudSaveItem(item);
+  } else {
+    _origSaveCurrentToDB();
+    return;
+  }
+  const n = document.getElementById('saved-notice');
+  n.textContent = '✅ 已儲存至雲端資料庫！';
+  n.style.display = 'block';
+  setTimeout(() => { n.style.display = 'none'; n.textContent = '✅ 版面已儲存！'; }, 2500);
+}
+
+// Auto-push layout on save
+const _origSaveLayout = saveLayout;
+async function saveLayout() {
+  _origSaveLayout();
+  await pushLayout();
+}
+
+function initSync() {
+  gasUrl = getGasUrl();
+  if (!gasUrl) {
+    document.getElementById('sync-setup').style.display = 'block';
+    document.getElementById('sync-bar').style.display   = 'none';
+    return;
+  }
+  document.getElementById('sync-setup').style.display    = 'none';
+  document.getElementById('sync-bar').style.display      = 'flex';
+  const inp = document.getElementById('gas-url-input');
+  if (inp) inp.value = gasUrl;
+  setSyncStatus('ing', '連線中…');
+  forcSync();
+  // Auto-sync every 30 seconds
+  if (syncTimer) clearInterval(syncTimer);
+  syncTimer = setInterval(syncProducts, 30000);
+}
+
+loadDB();
+updateDayDisplay();
+// Init sync after a short delay
+setTimeout(initSync, 300);
+// init bc-farmer default
+const bcFarmerEl = document.getElementById('bc-farmer');
+if(bcFarmerEl && !bcFarmerEl.value) bcFarmerEl.value='4509';
+</script>
+</body>
+</html>
