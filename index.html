@@ -163,36 +163,6 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
 #c-barcode{display:block;line-height:1;}
 #c-barcode svg{display:block;}
 
-/* ── Cloud Sync ── */
-.sync-bar{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:5px 9px;border-radius:4px;margin-bottom:6px;
-  font-size:10px;font-weight:700;gap:6px;
-  background:#f0f7ff;border:1px solid #b8d4f0;
-}
-.sync-status{display:flex;align-items:center;gap:5px;color:#2980b9;}
-.sync-dot{width:7px;height:7px;border-radius:50%;background:#ccc;flex-shrink:0;}
-.sync-dot.ok{background:#27ae60;}
-.sync-dot.err{background:#e74c3c;}
-.sync-dot.ing{background:#f39c12;animation:pulse .8s infinite alternate;}
-@keyframes pulse{from{opacity:.3}to{opacity:1}}
-.sync-btn{padding:2px 7px;border:1px solid #2980b9;border-radius:3px;
-  background:#fff;color:#2980b9;font-size:9.5px;font-weight:700;cursor:pointer;}
-.sync-btn:hover{background:#eaf3fb;}
-.sync-setup{
-  background:#fff8e1;border:1px solid #f0d080;border-radius:5px;
-  padding:9px 10px;margin-bottom:8px;font-size:10.5px;line-height:1.7;color:#7a5c00;
-}
-.sync-setup input{
-  width:100%;padding:4px 7px;border:1.5px solid #ddb;border-radius:3px;
-  font-family:monospace;font-size:11px;margin-top:3px;outline:none;
-}
-.sync-setup .save-url-btn{
-  margin-top:5px;padding:4px 12px;background:#1a1a1a;color:#fff;
-  border:none;border-radius:3px;font-family:inherit;font-size:11px;
-  font-weight:700;cursor:pointer;
-}
-
 /* ── DB Modal ── */
 .modal-overlay{
   display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);
@@ -291,6 +261,26 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
   }
   .lel.selected .inner{outline:none!important;}
 }
+
+/* ── Cloud Sync ── */
+.sync-bar{display:flex;align-items:center;justify-content:space-between;
+  padding:5px 9px;border-radius:4px;margin-bottom:6px;font-size:10px;font-weight:700;gap:6px;
+  background:#f0f7ff;border:1px solid #b8d4f0;}
+.sync-status{display:flex;align-items:center;gap:5px;color:#2980b9;}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:#ccc;flex-shrink:0;}
+.sync-dot.ok{background:#27ae60;}
+.sync-dot.err{background:#e74c3c;}
+.sync-dot.ing{background:#f39c12;animation:blink .8s infinite alternate;}
+@keyframes blink{from{opacity:.3}to{opacity:1}}
+.sync-btn{padding:2px 7px;border:1px solid #2980b9;border-radius:3px;
+  background:#fff;color:#2980b9;font-size:9.5px;font-weight:700;cursor:pointer;}
+.sync-btn:hover{background:#eaf3fb;}
+.sync-setup{background:#fff8e1;border:1px solid #f0d080;border-radius:5px;
+  padding:8px 10px;margin-bottom:7px;font-size:10.5px;line-height:1.7;color:#7a5c00;}
+.sync-setup input{width:100%;padding:4px 7px;border:1.5px solid #ddb;border-radius:3px;
+  font-family:monospace;font-size:10px;margin-top:3px;outline:none;}
+.sync-setup .save-url-btn{margin-top:5px;padding:4px 12px;background:#1a1a1a;color:#fff;
+  border:none;border-radius:3px;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;}
 </style>
 </head>
 <body>
@@ -308,10 +298,10 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
       <div class="sync-dot" id="sync-dot"></div>
       <span id="sync-status-text">未連線</span>
     </div>
-    <button class="sync-btn" onclick="forcSync()">↺ 立即同步</button>
+    <button class="sync-btn" onclick="forceSync()">↺ 同步</button>
   </div>
   <div class="sync-setup" id="sync-setup">
-    ☁️ 填入 Apps Script 網址以啟用雲端同步：
+    ☁️ 填入 Apps Script 網址啟用雲端同步：
     <input type="text" id="gas-url-input" placeholder="https://script.google.com/macros/s/.../exec">
     <button class="save-url-btn" onclick="saveGasUrl()">連線</button>
   </div>
@@ -1388,20 +1378,9 @@ function dbfAutoCalc() {
   const product = (document.getElementById('dbf-product')?.value||'').trim();
   const farmer  = (document.getElementById('dbf-farmer')?.value||'4509').trim();
   const price   = (document.getElementById('dbf-price')?.value||'').trim();
-  const barcodeEl = document.getElementById('dbf-barcode');
-  if (!barcodeEl) return;
-
   if (product.length===6 && farmer.length===4 && price && !isNaN(parseInt(price))) {
     const code = calcBarcode(product, farmer, parseInt(price));
-    if (code) {
-      barcodeEl.value = code;
-      barcodeEl.style.background = '#f0fff0';
-      barcodeEl.style.color = '#1a7a1a';
-      barcodeEl.title = '自動計算：26+'+ product +'+'+ farmer +'+檢核+'+ String(parseInt(price)).padStart(4,'0') +'+檢核';
-    }
-  } else {
-    barcodeEl.style.background = '#f5f5f5';
-    barcodeEl.style.color = '#888';
+    if (code) document.getElementById('dbf-barcode').value = code;
   }
 }
 
@@ -1492,235 +1471,213 @@ const _origSyncContent = syncContent;
 const _origSaveCurrentToDB = saveCurrentToDB;
 
 // ================================================================
-// Cloud Sync — Google Apps Script bridge
+// ☁️ Cloud Sync — Google Apps Script
 // ================================================================
-const GAS_URL_KEY = 'label_gas_url';
-// ★ 將下方網址換成你的 Apps Script 部署網址 ★
+// ★ 將下方換成你的 Apps Script 部署網址（部署後填入）★
 const GAS_URL_HARDCODED = 'https://script.google.com/macros/s/AKfycbwuBHVErKSI9iPapSwLGTFnca72BZJRbS0XANSVB342l9Hje_ZSz9lL6WOblwWB_-jr/exec';
-let gasUrl = '';
-let syncTimer = null;
-let lastSyncTime = 0;
+const GAS_URL_KEY = 'label_gas_url_v1';
 
-function getGasUrl() {
-  if (GAS_URL_HARDCODED && GAS_URL_HARDCODED !== 'YOUR_GAS_URL_HERE')
-    return GAS_URL_HARDCODED;
-  return localStorage.getItem(GAS_URL_KEY) || '';
+function getGasUrl(){
+  if(GAS_URL_HARDCODED && GAS_URL_HARDCODED!=='YOUR_GAS_URL_HERE') return GAS_URL_HARDCODED;
+  return localStorage.getItem(GAS_URL_KEY)||'';
 }
 
-function saveGasUrl() {
-  const url = document.getElementById('gas-url-input').value.trim();
-  if (!url || !url.startsWith('https://script.google.com')) {
-    alert('請貼上正確的 Apps Script 部署網址\n（https://script.google.com/macros/s/.../exec）');
+function saveGasUrl(){
+  const url=(document.getElementById('gas-url-input').value||'').trim();
+  if(!url||!url.startsWith('https://script.google.com')){
+    alert('請貼上正確的 Apps Script 網址\n格式：https://script.google.com/macros/s/.../exec');
     return;
   }
   localStorage.setItem(GAS_URL_KEY, url);
-  gasUrl = url;
   initSync();
 }
 
-async function gasCall(action, body = {}) {
-  const url = getGasUrl();
-  if (!url) throw new Error('未設定 GAS URL');
-  const res = await fetch(url + '?action=' + action, {
-    method: 'POST',
-    body: JSON.stringify({ action, ...body }),
+function setSyncStatus(state, text){
+  const dot=document.getElementById('sync-dot');
+  const txt=document.getElementById('sync-status-text');
+  if(!dot) return;
+  dot.className='sync-dot '+state;
+  txt.textContent=text;
+}
+
+async function gasCall(action, body={}){
+  const url=getGasUrl();
+  if(!url) throw new Error('未設定網址');
+  const res=await fetch(url+'?action='+action,{
+    method:'POST',
+    body:JSON.stringify({action,...body}),
   });
-  const data = await res.json();
-  if (!data.ok && data.error) throw new Error(data.error);
+  const data=await res.json();
+  if(!data.ok && data.error) throw new Error(data.error);
   return data;
 }
 
-function setSyncStatus(state, text) {
-  const dot = document.getElementById('sync-dot');
-  const txt = document.getElementById('sync-status-text');
-  if (!dot) return;
-  dot.className = 'sync-dot ' + state;
-  txt.textContent = text;
-}
-
-async function syncProducts() {
-  try {
-    setSyncStatus('ing', '同步品項中…');
-    const data = await gasCall('products.list');
-    dbItems = data.items || [];
-    saveDB(); // also cache locally
-    renderDBList();
-    setSyncStatus('ok', '品項已同步 ' + new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}));
-  } catch(e) {
-    setSyncStatus('err', '同步失敗：' + e.message);
-  }
-}
-
-async function syncLayout() {
-  try {
-    const data = await gasCall('layout.get');
-    if (data.layout) {
-      const remote = JSON.parse(data.layout);
-      // Only apply if remote is newer (has updatedAt)
-      S = remote;
-      window.S = S;
-      applyAll();
-      updateAllSliders();
-      renderBarcode();
+// ── Products sync ──
+async function syncProducts(){
+  try{
+    setSyncStatus('ing','同步中…');
+    const data=await gasCall('products.list');
+    if(data.items){
+      dbItems=data.items;
+      localStorage.setItem('label_product_db_v1',JSON.stringify(dbItems));
+      renderDBList();
     }
-  } catch(e) {
-    console.warn('Layout sync failed:', e.message);
+    setSyncStatus('ok','已同步 '+new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}));
+  }catch(e){
+    setSyncStatus('err','失敗：'+e.message.slice(0,20));
+    console.warn('syncProducts error:',e);
   }
 }
 
-async function pushLayout() {
-  const url = getGasUrl();
-  if (!url) return;
-  try {
-    await gasCall('layout.save', { layout: JSON.stringify(S) });
-  } catch(e) {
-    console.warn('Layout push failed:', e.message);
-  }
+// ── Layout sync ──
+async function syncLayout(){
+  try{
+    const data=await gasCall('layout.get');
+    if(data.layout){
+      const remote=JSON.parse(data.layout);
+      Object.assign(S, remote);
+      window.S=S;
+      applyAll(); updateAllSliders(); renderBarcode();
+    }
+  }catch(e){ console.warn('layout sync:',e); }
 }
 
-async function forcSync() {
+async function pushLayout(){
+  if(!getGasUrl()) return;
+  try{ await gasCall('layout.save',{layout:JSON.stringify(S)}); }
+  catch(e){ console.warn('push layout:',e); }
+}
+
+async function forceSync(){
   await syncProducts();
   await syncLayout();
 }
 
-// Cloud-aware DB operations
-async function cloudSaveItem(item) {
-  const url = getGasUrl();
-  if (!url) { saveDB(); return; }
-  try {
-    setSyncStatus('ing', '儲存中…');
-    const res = await gasCall('products.save', item);
-    if (res.id) item.id = res.id;
+// ── Override DB operations to be cloud-aware ──
+const _localSaveDB = saveDB;
+
+async function cloudSaveItem(item){
+  try{
+    setSyncStatus('ing','儲存中…');
+    const res=await gasCall('products.save',item);
+    if(res.id) item.id=res.id;
     await syncProducts();
-  } catch(e) {
-    setSyncStatus('err', '儲存失敗');
-    saveDB();
+  }catch(e){
+    setSyncStatus('err','儲存失敗');
+    _localSaveDB();
   }
 }
 
-async function cloudDeleteItem(id) {
-  const url = getGasUrl();
-  if (!url) return;
-  try {
-    setSyncStatus('ing', '刪除中…');
-    await gasCall('products.delete', { id });
+async function cloudDeleteItem(id){
+  try{
+    setSyncStatus('ing','刪除中…');
+    await gasCall('products.delete',{id});
     await syncProducts();
-  } catch(e) {
-    setSyncStatus('err', '刪除失敗');
+  }catch(e){
+    setSyncStatus('err','刪除失敗');
   }
 }
 
-// Patch delDBItem to use cloud
-const _origDelDBItem = delDBItem;
-async function delDBItem(i) {
-  if (!confirm('確定刪除「' + dbItems[i].title + '」？')) return;
-  const item = dbItems[i];
-  const url = getGasUrl();
-  if (url && item.id) {
-    dbItems.splice(i, 1);
-    saveDB();
-    renderDBList();
-    await cloudDeleteItem(item.id);
-  } else {
-    dbItems.splice(i, 1);
-    saveDB();
-    renderDBList();
-  }
+// Override delDBItem
+async function delDBItem(i){
+  if(!confirm('確定刪除「'+dbItems[i].title+'」？')) return;
+  const item=dbItems[i];
+  dbItems.splice(i,1);
+  _localSaveDB();
+  renderDBList();
+  if(getGasUrl() && item.id) await cloudDeleteItem(item.id);
 }
 
-// Patch saveDBItem to use cloud
-const _origSaveDBItem = saveDBItem;
-async function saveDBItem() {
-  const item = {
-    id:      dbEditIndex >= 0 ? (dbItems[dbEditIndex].id || '') : '',
+// Override saveDBItem
+async function saveDBItem(){
+  const item={
+    id:      dbEditIndex>=0?(dbItems[dbEditIndex].id||''):'',
     title:   document.getElementById('dbf-title').value.trim(),
     line1:   document.getElementById('dbf-line1').value.trim(),
     line2:   document.getElementById('dbf-line2').value.trim(),
     line3:   document.getElementById('dbf-line3').value.trim(),
     product: document.getElementById('dbf-product').value.trim(),
-    farmer:  document.getElementById('dbf-farmer').value.trim() || '4509',
+    farmer:  document.getElementById('dbf-farmer').value.trim()||'4509',
     price:   document.getElementById('dbf-price').value.trim(),
     barcode: document.getElementById('dbf-barcode').value.trim(),
   };
-  if (!item.title) { alert('請輸入主標題'); return; }
-  const url = getGasUrl();
-  if (url) {
-    cancelDBForm();
+  if(!item.title){alert('請輸入主標題');return;}
+  cancelDBForm();
+  if(getGasUrl()){
     await cloudSaveItem(item);
   } else {
-    if (dbEditIndex >= 0) dbItems[dbEditIndex] = item;
+    if(dbEditIndex>=0) dbItems[dbEditIndex]=item;
     else dbItems.push(item);
-    saveDB();
-    renderDBList();
-    cancelDBForm();
+    _localSaveDB(); renderDBList();
   }
 }
 
-// Patch saveCurrentToDB to use cloud
-const _origSaveCurrentToDB = saveCurrentToDB;
-async function saveCurrentToDB() {
-  const item = {
+// Override saveCurrentToDB
+async function saveCurrentToDB(){
+  const item={
     title:   document.getElementById('f-title').value.trim(),
     line1:   document.getElementById('f-line1').value.trim(),
     line2:   document.getElementById('f-line2').value.trim(),
     line3:   document.getElementById('f-line3').value.trim(),
-    product: document.getElementById('bc-product')?.value.trim() || '',
-    farmer:  document.getElementById('bc-farmer')?.value.trim() || '4509',
+    product: document.getElementById('bc-product')?.value.trim()||'',
+    farmer:  document.getElementById('bc-farmer')?.value.trim()||'4509',
     price:   document.getElementById('f-price').value.trim(),
     barcode: document.getElementById('f-barcode').value.trim(),
   };
-  if (!item.title) { alert('請先輸入主標題'); return; }
-  const url = getGasUrl();
-  if (url) {
-    // Check duplicate by title+barcode
-    const dup = dbItems.findIndex(d => d.title === item.title && d.barcode === item.barcode);
-    if (dup >= 0) {
-      if (!confirm('「' + item.title + '」已存在，要覆蓋嗎？')) return;
-      item.id = dbItems[dup].id || '';
+  if(!item.title){alert('請先輸入主標題');return;}
+  if(getGasUrl()){
+    const dup=dbItems.findIndex(d=>d.title===item.title&&d.barcode===item.barcode);
+    if(dup>=0){
+      if(!confirm('「'+item.title+'」已存在，要覆蓋嗎？')) return;
+      item.id=dbItems[dup].id||'';
     }
     await cloudSaveItem(item);
   } else {
-    _origSaveCurrentToDB();
-    return;
+    const dup=dbItems.findIndex(d=>d.title===item.title&&d.barcode===item.barcode);
+    if(dup>=0){
+      if(!confirm('「'+item.title+'」已存在，要覆蓋嗎？')) return;
+      dbItems[dup]=item;
+    } else { dbItems.push(item); }
+    _localSaveDB();
   }
-  const n = document.getElementById('saved-notice');
-  n.textContent = '✅ 已儲存至雲端資料庫！';
-  n.style.display = 'block';
-  setTimeout(() => { n.style.display = 'none'; n.textContent = '✅ 版面已儲存！'; }, 2500);
+  const n=document.getElementById('saved-notice');
+  n.textContent='✅ 已儲存至'+(getGasUrl()?'雲端':'本地')+'資料庫！';
+  n.style.display='block';
+  setTimeout(()=>{n.style.display='none';n.textContent='✅ 版面已儲存！';},2500);
 }
 
-// Auto-push layout on save
-const _origSaveLayout = saveLayout;
-async function saveLayout() {
+// Override saveLayout to also push to cloud
+const _origSaveLayout=saveLayout;
+async function saveLayout(){
   _origSaveLayout();
   await pushLayout();
 }
 
-function initSync() {
-  gasUrl = getGasUrl();
-  if (!gasUrl) {
-    document.getElementById('sync-setup').style.display = 'block';
-    document.getElementById('sync-bar').style.display   = 'none';
+let _syncTimer=null;
+function initSync(){
+  const url=getGasUrl();
+  if(!url){
+    document.getElementById('sync-setup').style.display='block';
+    document.getElementById('sync-bar').style.display='none';
     return;
   }
-  document.getElementById('sync-setup').style.display    = 'none';
-  document.getElementById('sync-bar').style.display      = 'flex';
-  const inp = document.getElementById('gas-url-input');
-  if (inp) inp.value = gasUrl;
-  setSyncStatus('ing', '連線中…');
-  forcSync();
-  // Auto-sync every 30 seconds
-  if (syncTimer) clearInterval(syncTimer);
-  syncTimer = setInterval(syncProducts, 30000);
+  document.getElementById('sync-setup').style.display='none';
+  document.getElementById('sync-bar').style.display='flex';
+  const inp=document.getElementById('gas-url-input');
+  if(inp) inp.value=url;
+  setSyncStatus('ing','連線中…');
+  forceSync();
+  if(_syncTimer) clearInterval(_syncTimer);
+  _syncTimer=setInterval(syncProducts, 30000);
 }
 
+// ================================================================
 loadDB();
 updateDayDisplay();
-// Init sync after a short delay
-setTimeout(initSync, 300);
 // init bc-farmer default
 const bcFarmerEl = document.getElementById('bc-farmer');
 if(bcFarmerEl && !bcFarmerEl.value) bcFarmerEl.value='4509';
+setTimeout(initSync, 400);
 </script>
 </body>
 </html>
