@@ -57,6 +57,31 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
   padding:1px 5px;cursor:pointer;color:var(--muted);}
 .vis-btn.hidden{background:#fee;border-color:#f99;color:#c00;}
 
+/* lock button */
+.lel.locked .inner{cursor:not-allowed!important;}
+.lel.locked .resize-handle,.lel.locked .bc-drag-handle{display:none!important;}
+.lel.locked.selected .inner{outline:1.5px dashed #f0a500;outline-offset:2px;}
+#global-lock-btn.is-locked{background:#fff3cd;border-color:#f0a500;color:#b07800;font-weight:900;}
+
+/* image element */
+.lel-img img{display:block;max-width:100%;max-height:100%;object-fit:contain;}
+
+/* barcode check banner */
+.bc-check-ok{background:#f0fff0;border:1px solid #8bc34a;border-radius:4px;
+  padding:4px 8px;font-size:10px;color:#2e7d32;margin-top:4px;display:none;}
+.bc-check-err{background:#fff0f0;border:1px solid #e57373;border-radius:4px;
+  padding:4px 8px;font-size:10px;color:#c62828;margin-top:4px;display:none;}
+
+/* image upload area */
+.img-upload-area{border:1.5px dashed #ccc;border-radius:4px;padding:6px 8px;
+  margin-bottom:6px;background:#fafaf8;text-align:center;cursor:pointer;
+  transition:border-color .15s;position:relative;}
+.img-upload-area:hover{border-color:#888;}
+.img-upload-area input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;}
+.img-upload-area .img-preview{max-width:100%;max-height:50px;object-fit:contain;display:none;margin:0 auto;}
+.img-upload-area .img-hint{font-size:9.5px;color:var(--muted);}
+.img-clear-btn{font-size:9px;color:#e74c3c;background:none;border:none;cursor:pointer;margin-left:4px;}
+
 .btn-print{width:100%;margin-top:10px;padding:8px;
   background:var(--dark);color:#fff;border:none;border-radius:4px;
   font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;}
@@ -324,7 +349,7 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
     <input type="text" id="f-line4" value=""></div>
   <div class="row2">
     <div class="fg"><label>價格</label>
-      <input type="text" id="f-price" value="46" oninput="autoCalcBarcode()"></div>
+      <input type="text" id="f-price" value="46" oninput="autoCalcBarcode();checkBarcode()"></div>
     <div class="fg"><label>單位</label>
       <input type="text" id="f-unit" value="元"></div>
   </div>
@@ -353,6 +378,35 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
   </div>
   <input type="hidden" id="f-prefix" value="97">
 
+  <div class="sec">圖片（最多3張）</div>
+  <!-- Image 1 -->
+  <div class="fg">
+    <label>圖片 1 <button class="img-clear-btn" onclick="clearImg('el-img1')">✕ 清除</button></label>
+    <div class="img-upload-area" id="img-upload-1">
+      <input type="file" accept="image/*" onchange="loadImg(event,'el-img1','img-preview-1','img-hint-1')">
+      <img id="img-preview-1" class="img-preview">
+      <div class="img-hint" id="img-hint-1">點擊上傳圖片</div>
+    </div>
+  </div>
+  <!-- Image 2 -->
+  <div class="fg">
+    <label>圖片 2 <button class="img-clear-btn" onclick="clearImg('el-img2')">✕ 清除</button></label>
+    <div class="img-upload-area" id="img-upload-2">
+      <input type="file" accept="image/*" onchange="loadImg(event,'el-img2','img-preview-2','img-hint-2')">
+      <img id="img-preview-2" class="img-preview">
+      <div class="img-hint" id="img-hint-2">點擊上傳圖片</div>
+    </div>
+  </div>
+  <!-- Image 3 -->
+  <div class="fg">
+    <label>圖片 3 <button class="img-clear-btn" onclick="clearImg('el-img3')">✕ 清除</button></label>
+    <div class="img-upload-area" id="img-upload-3">
+      <input type="file" accept="image/*" onchange="loadImg(event,'el-img3','img-preview-3','img-hint-3')">
+      <img id="img-preview-3" class="img-preview">
+      <div class="img-hint" id="img-hint-3">點擊上傳圖片</div>
+    </div>
+  </div>
+
   <!-- 條碼自動計算區 -->
   <div style="background:#f0f7ff;border:1.5px solid #b8d4f0;border-radius:5px;padding:9px 10px;margin-bottom:8px;">
     <div style="font-size:10px;font-weight:700;color:#2980b9;text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px;">
@@ -362,7 +416,7 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
       <div class="fg" style="margin-bottom:0;">
         <label>產品貨號（6碼）</label>
         <input type="text" id="bc-product" maxlength="6" placeholder="982079"
-          oninput="this.value=this.value.replace(/\D/g,'');autoCalcBarcode()">
+          oninput="this.value=this.value.replace(/\D/g,'');autoCalcBarcode();checkBarcode()">
       </div>
       <div class="fg" style="margin-bottom:0;">
         <label>農友廠編（4碼，固定）</label>
@@ -380,7 +434,10 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
   </div>
 
   <div class="fg"><label>條碼數值（可手動覆蓋）</label>
-    <input type="text" id="f-barcode" value="2698207945095003"></div>
+    <input type="text" id="f-barcode" value="2698207945095003" oninput="checkBarcodeDelay()">
+    <div class="bc-check-ok" id="bc-check-ok">✅ 條碼正確，與貨號/廠編/價格相符</div>
+    <div class="bc-check-err" id="bc-check-err">⚠️ 條碼不符！預期：<span id="bc-expected"></span></div>
+  </div>
 
   <div class="sec">元素位置 &amp; 大小</div>
   <div class="sel-info" id="sel-info">
@@ -392,6 +449,10 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
     <button class="btn-sec" onclick="saveLayout()">💾 儲存版面</button>
     <button class="btn-sec" onclick="resetLayout()">↺ 重置</button>
   </div>
+  <button class="btn-sec" id="global-lock-btn" onclick="toggleGlobalLock()"
+    style="width:100%;margin-top:6px;border-color:#f0a500;color:#b07800;">
+    🔓 版面未鎖定（點擊鎖定）
+  </button>
   <div class="saved-notice" id="saved-notice">✅ 版面已儲存！</div>
   <div class="hint">列印：紙張 <strong>55×40mm</strong>、邊距「無」、縮放「100%」、關閉頁首頁尾<br>
     💾 版面會在關閉視窗後自動記憶</div>
@@ -441,6 +502,19 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
       </div>
       <div class="bc-drag-handle bc-right" data-id="el-barcode" data-dir="right"></div>
       <div class="resize-handle" data-id="el-barcode"></div>
+    </div>
+    <!-- Image elements -->
+    <div class="lel lel-img" id="el-img1" style="display:none;">
+      <div class="inner" id="c-img1"><img src="" alt="圖片1" style="display:block;"></div>
+      <div class="resize-handle" data-id="el-img1"></div>
+    </div>
+    <div class="lel lel-img" id="el-img2" style="display:none;">
+      <div class="inner" id="c-img2"><img src="" alt="圖片2" style="display:block;"></div>
+      <div class="resize-handle" data-id="el-img2"></div>
+    </div>
+    <div class="lel lel-img" id="el-img3" style="display:none;">
+      <div class="inner" id="c-img3"><img src="" alt="圖片3" style="display:block;"></div>
+      <div class="resize-handle" data-id="el-img3"></div>
     </div>
   </div>
 </div>
@@ -574,15 +648,18 @@ const BC=(()=>{
 // Default layout (550×400 shell coords)
 // ═══════════════════════════════════════════════════════════
 const DEFAULTS = {
-  'el-title':  {x:11,  y:0,   fs:60, vis:true},
-  'el-line1':  {x:13,  y:82,  fs:30, vis:true},
-  'el-line2':  {x:13,  y:124, fs:30, vis:true},
-  'el-line3':  {x:13,  y:166, fs:30, vis:true},
-  'el-line4':  {x:8,   y:104, fs:14, vis:true},
-  'el-price':  {x:386, y:117, fs:80, vis:true},
-  'el-unit':   {x:486, y:166, fs:33, vis:true},
-  'el-prefix': {x:20,  y:337, fs:31, vis:true, pw:61, ph:50},
-  'el-barcode':{x:13,  y:229, fs:16, bd:0.8, bw:500, bh:48, vis:true},
+  'el-title':  {x:11,  y:0,   fs:60, vis:true,  locked:false},
+  'el-line1':  {x:13,  y:82,  fs:30, vis:true,  locked:false},
+  'el-line2':  {x:13,  y:124, fs:30, vis:true,  locked:false},
+  'el-line3':  {x:13,  y:166, fs:30, vis:true,  locked:false},
+  'el-line4':  {x:8,   y:104, fs:14, vis:true,  locked:false},
+  'el-price':  {x:386, y:117, fs:80, vis:true,  locked:false},
+  'el-unit':   {x:486, y:166, fs:33, vis:true,  locked:false},
+  'el-prefix': {x:20,  y:337, fs:31, vis:true,  locked:false, pw:61, ph:50},
+  'el-barcode':{x:13,  y:229, fs:16, bd:0.8, bw:500, bh:48, vis:true, locked:false},
+  'el-img1':   {x:10,  y:150, iw:80, ih:80, vis:false, locked:false},
+  'el-img2':   {x:100, y:150, iw:80, ih:80, vis:false, locked:false},
+  'el-img3':   {x:190, y:150, iw:80, ih:80, vis:false, locked:false},
 };
 
 const META = {
@@ -595,6 +672,9 @@ const META = {
   'el-unit':   {label:'單位',      color:'#16a085', fsMin:10, fsMax:50},
   'el-prefix': {label:'前置方框',  color:'#7f8c8d', fsMin:10, fsMax:40, hasPW:true, hasPH:true},
   'el-barcode':{label:'條碼',      color:'#2c3e50', fsMin:6,  fsMax:40, hasBD:true, hasBW:true, hasBH:true},
+  'el-img1':   {label:'圖片 1',    color:'#00897b', hasIW:true, hasIH:true, isImg:true},
+  'el-img2':   {label:'圖片 2',    color:'#00897b', hasIW:true, hasIH:true, isImg:true},
+  'el-img3':   {label:'圖片 3',    color:'#00897b', hasIW:true, hasIH:true, isImg:true},
 };
 
 // current layout state
@@ -609,6 +689,8 @@ function loadState(){
   // ensure all keys exist
   Object.keys(DEFAULTS).forEach(k=>{
     if(!S[k]) S[k]=JSON.parse(JSON.stringify(DEFAULTS[k]));
+    // ensure locked key exists
+    if(S[k].locked===undefined) S[k].locked=false;
   });
 }
 
@@ -638,6 +720,15 @@ function applyEl(id){
   el.style.left    = s.x+'px';
   el.style.top     = s.y+'px';
   el.style.display = s.vis===false ? 'none' : '';
+  // locked state
+  if(s.locked) el.classList.add('locked');
+  else el.classList.remove('locked');
+  // image size
+  if(id.startsWith('el-img')){
+    const img=el.querySelector('img');
+    if(img){img.style.width=(s.iw||80)+'px';img.style.height=(s.ih||80)+'px';}
+    return;
+  }
 
   if(id==='el-prefix'){
     const c = document.getElementById('c-prefix');
@@ -698,6 +789,7 @@ function buildList(){
     vBtn.textContent=s.vis===false?'隱藏':'顯示';
     vBtn.onclick=(e)=>{e.stopPropagation(); toggleVis(id);};
     head.appendChild(vBtn);
+
     row.appendChild(head);
 
     // sliders
@@ -785,6 +877,40 @@ function toggleVis(id){
   btn.className='vis-btn'+(S[id].vis?'':' hidden');
 }
 
+let globalLocked = false;
+
+function toggleGlobalLock(){
+  globalLocked = !globalLocked;
+  const btn = document.getElementById('global-lock-btn');
+  if(globalLocked){
+    // Lock all elements
+    Object.keys(S).forEach(id=>{
+      S[id].locked = true;
+      document.getElementById(id)?.classList.add('locked');
+    });
+    if(selectedId) selectEl(null);
+    btn.textContent = '🔒 版面已鎖定（點擊解鎖）';
+    btn.classList.add('is-locked');
+  } else {
+    // Unlock all elements
+    Object.keys(S).forEach(id=>{
+      S[id].locked = false;
+      document.getElementById(id)?.classList.remove('locked');
+    });
+    btn.textContent = '🔓 版面未鎖定（點擊鎖定）';
+    btn.classList.remove('is-locked');
+  }
+  localStorage.setItem('label_layout_v9', JSON.stringify(S));
+}
+
+function toggleLock(id){
+  S[id].locked=!S[id].locked;
+  const el=document.getElementById(id);
+  if(S[id].locked){ el.classList.add('locked'); if(selectedId===id) selectEl(null); }
+  else el.classList.remove('locked');
+  localStorage.setItem('label_layout_v9',JSON.stringify(S));
+}
+
 // ═══════════════════════════════════════════════════════════
 // Guidelines (snap lines)
 // ═══════════════════════════════════════════════════════════
@@ -859,6 +985,7 @@ document.querySelectorAll('.lel .inner').forEach(inner=>{
 document.querySelectorAll('.resize-handle').forEach(h=>{
   h.addEventListener('mousedown',e=>{
     const id=h.dataset.id;
+    if(S[id]&&S[id].locked) return; // locked
     selectEl(id);
     const el=document.getElementById(id);
     const inner=el.querySelector('.inner');
@@ -938,6 +1065,22 @@ document.addEventListener('mousemove',e=>{
       if(sl){sl.value=Math.round(S[id][k]);nm.textContent=Math.round(S[id][k]);}
     });
     updateSelInfo(id);
+
+  } else if(dragState.type==='img-resize'){
+    const id=dragState.id;
+    const dx=e.clientX-dragState.ox;
+    const dy=e.clientY-dragState.oy;
+    const nw=Math.max(10,dragState.origIW+dx);
+    const nh=Math.max(10,dragState.origIH+dy);
+    S[id].iw=Math.round(nw); S[id].ih=Math.round(nh);
+    const img=document.querySelector('#'+id+' img');
+    if(img){img.style.width=nw+'px';img.style.height=nh+'px';}
+    // sync sliders
+    ['iw','ih'].forEach(k=>{
+      const sl=document.getElementById(`sl-${id}-${k}`);
+      const nm=document.getElementById(`nm-${id}-${k}`);
+      if(sl){sl.value=Math.round(S[id][k]);if(nm)nm.textContent=Math.round(S[id][k]);}
+    });
 
   } else if(dragState.type==='bc-width'){
     const id=dragState.id;
@@ -1471,10 +1614,146 @@ const _origSyncContent = syncContent;
 const _origSaveCurrentToDB = saveCurrentToDB;
 
 // ================================================================
+// Image upload & management
+// ================================================================
+const imgData = {img1:null, img2:null, img3:null};
+
+function loadImg(event, elId, previewId, hintId){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e=>{
+    const src = e.target.result;
+    const key = elId.replace('el-','');
+    imgData[key] = src;
+    // Update preview thumbnail in panel
+    const prev=document.getElementById(previewId);
+    const hint=document.getElementById(hintId);
+    prev.src=src; prev.style.display='block'; hint.style.display='none';
+    // Update label element
+    const img=document.querySelector('#'+elId+' img');
+    if(img){ img.src=src; img.style.display='block'; }
+    const s=S[elId]||(S[elId]={x:10,y:150,iw:80,ih:80,vis:true,locked:false});
+    s.vis=true;
+    document.getElementById(elId).style.display='';
+    const i2=document.querySelector('#'+elId+' img');
+    if(i2){i2.style.width=(s.iw||80)+'px';i2.style.height=(s.ih||80)+'px';}
+    // save to localStorage
+    try{ localStorage.setItem('label_img_'+key, src); }catch(e){console.warn('img save failed');}
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearImg(elId){
+  const key=elId.replace('el-','');
+  imgData[key]=null;
+  const num=key.replace('img','');
+  const prev=document.getElementById('img-preview-'+num);
+  const hint=document.getElementById('img-hint-'+num);
+  if(prev){prev.src='';prev.style.display='none';}
+  if(hint) hint.style.display='block';
+  const img=document.querySelector('#'+elId+' img');
+  if(img){img.src='';img.style.display='none';}
+  if(S[elId]) S[elId].vis=false;
+  document.getElementById(elId).style.display='none';
+  localStorage.removeItem('label_img_'+key);
+}
+
+function loadSavedImages(){
+  ['img1','img2','img3'].forEach((key,i)=>{
+    const src=localStorage.getItem('label_img_'+key);
+    if(!src) return;
+    imgData[key]=src;
+    const num=i+1;
+    const prev=document.getElementById('img-preview-'+num);
+    const hint=document.getElementById('img-hint-'+num);
+    if(prev){prev.src=src;prev.style.display='block';}
+    if(hint) hint.style.display='none';
+    const elId='el-'+key;
+    const img=document.querySelector('#'+elId+' img');
+    if(img){img.src=src;img.style.display='block';}
+    if(S[elId]){
+      S[elId].vis=true;
+      document.getElementById(elId).style.display='';
+      const i2=document.querySelector('#'+elId+' img');
+      if(i2){i2.style.width=(S[elId].iw||80)+'px';i2.style.height=(S[elId].ih||80)+'px';}
+    }
+  });
+}
+
+// ── image resize handle ──
+document.querySelectorAll('.lel-img .resize-handle').forEach(h=>{
+  h.addEventListener('mousedown',e=>{
+    const id=h.dataset.id;
+    if(S[id]&&S[id].locked) return;
+    selectEl(id);
+    dragState={
+      type:'img-resize', id,
+      ox:e.clientX, oy:e.clientY,
+      origIW: S[id]?.iw||80,
+      origIH: S[id]?.ih||80,
+    };
+    e.preventDefault(); e.stopPropagation();
+  });
+});
+
+// ================================================================
+// Barcode verification
+// ================================================================
+let _bcCheckTimer = null;
+function checkBarcode(showAlert){
+  const barcode = (document.getElementById('f-barcode')?.value||'').trim();
+  const product = (document.getElementById('bc-product')?.value||'').trim();
+  const farmer  = (document.getElementById('bc-farmer')?.value||'4509').trim();
+  const price   = (document.getElementById('f-price')?.value||'').trim();
+  const okEl    = document.getElementById('bc-check-ok');
+  const errEl   = document.getElementById('bc-check-err');
+  const expEl   = document.getElementById('bc-expected');
+  if(!okEl||!errEl) return;
+  // Need all fields to validate
+  if(!product||product.length!==6||!farmer||farmer.length!==4||!price||!barcode||barcode.length!==18){
+    okEl.style.display='none'; errEl.style.display='none'; return;
+  }
+  const priceInt=parseInt(price);
+  if(isNaN(priceInt)){ okEl.style.display='none'; errEl.style.display='none'; return; }
+  const expected=calcBarcode(product,farmer,priceInt);
+  if(!expected){ okEl.style.display='none'; errEl.style.display='none'; return; }
+  if(barcode===expected){
+    okEl.style.display='block'; errEl.style.display='none';
+  } else {
+    okEl.style.display='none'; errEl.style.display='block';
+    if(expEl) expEl.textContent=expected;
+    // Show alert with debounce (only when user stops typing, or explicit call)
+    if(showAlert){
+      alert(
+        '⚠️ 條碼數值不符！
+
+' +
+        '輸入值：' + barcode + '
+' +
+        '正確值：' + expected + '
+
+' +
+        '系統已依貨號、廠編、價格重新計算。
+' +
+        '請確認是否要更正條碼，或價格/貨號是否有誤。'
+      );
+    }
+  }
+}
+
+// Trigger alert after user stops editing barcode field for 1.5s
+function checkBarcodeDelay(){
+  checkBarcode(false); // update UI immediately
+  clearTimeout(_bcCheckTimer);
+  _bcCheckTimer = setTimeout(()=>checkBarcode(true), 1500);
+}
+
+// ================================================================
 // ☁️ Cloud Sync — Google Apps Script
 // ================================================================
 // ★ 將下方換成你的 Apps Script 部署網址（部署後填入）★
-const GAS_URL_HARDCODED = 'https://script.google.com/macros/s/AKfycbwuBHVErKSI9iPapSwLGTFnca72BZJRbS0XANSVB342l9Hje_ZSz9lL6WOblwWB_-jr/exec';
+const GAS_URL_HARDCODED = 'YOUR_GAS_URL_HERE';
 const GAS_URL_KEY = 'label_gas_url_v1';
 
 function getGasUrl(){
@@ -1674,6 +1953,20 @@ function initSync(){
 // ================================================================
 loadDB();
 updateDayDisplay();
+loadSavedImages();
+checkBarcode(false);
+// Restore global lock state
+(function(){
+  const anyLocked = Object.values(S).some(s=>s.locked);
+  if(anyLocked){
+    globalLocked = true;
+    const btn = document.getElementById('global-lock-btn');
+    if(btn){ btn.textContent='🔒 版面已鎖定（點擊解鎖）'; btn.classList.add('is-locked'); }
+    Object.keys(S).forEach(id=>{
+      if(S[id].locked) document.getElementById(id)?.classList.add('locked');
+    });
+  }
+})();
 // init bc-farmer default
 const bcFarmerEl = document.getElementById('bc-farmer');
 if(bcFarmerEl && !bcFarmerEl.value) bcFarmerEl.value='4509';
