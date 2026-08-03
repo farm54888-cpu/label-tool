@@ -1725,19 +1725,7 @@ function checkBarcode(showAlert){
     if(expEl) expEl.textContent=expected;
     // Show alert with debounce (only when user stops typing, or explicit call)
     if(showAlert){
-      alert(
-        '⚠️ 條碼數值不符！
-
-' +
-        '輸入值：' + barcode + '
-' +
-        '正確值：' + expected + '
-
-' +
-        '系統已依貨號、廠編、價格重新計算。
-' +
-        '請確認是否要更正條碼，或價格/貨號是否有誤。'
-      );
+      alert('⚠️ 條碼數值不符！\n\n輸入值：' + barcode + '\n正確值：' + expected + '\n\n請確認價格/貨號是否有誤。');
     }
   }
 }
