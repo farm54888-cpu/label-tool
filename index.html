@@ -1762,12 +1762,21 @@ function getGasUrl(){
 }
 
 function saveGasUrl(){
-  const url=(document.getElementById('gas-url-input').value||'').trim();
-  if(!url||!url.startsWith('https://script.google.com')){
-    alert('請貼上正確的 Apps Script 網址\n格式：https://script.google.com/macros/s/.../exec');
+  const raw = (document.getElementById('gas-url-input').value||'').trim();
+  // 移除可能誤貼的空白或換行
+  const url = raw.replace(/\s+/g,'');
+  if(!url){
+    alert('請貼上 Apps Script 部署網址');
     return;
   }
-  localStorage.setItem(GAS_URL_KEY, url);
+  if(!url.includes('script.google.com')){
+    alert('網址格式不正確\n正確格式：\nhttps://script.google.com/macros/s/.../exec\n\n目前輸入：\n'+url);
+    return;
+  }
+  // 確保有 /exec 結尾
+  const finalUrl = url.endsWith('/exec') ? url : url.replace(/\/?$/, '/exec');
+  document.getElementById('gas-url-input').value = finalUrl;
+  localStorage.setItem(GAS_URL_KEY, finalUrl);
   initSync();
 }
 
@@ -1782,11 +1791,16 @@ function setSyncStatus(state, text){
 async function gasCall(action, body={}){
   const url=getGasUrl();
   if(!url) throw new Error('未設定網址');
-  const res=await fetch(url+'?action='+action,{
-    method:'POST',
-    body:JSON.stringify({action,...body}),
+
+  // Encode all params into GET query string (GAS supports GET for CORS)
+  const payload = encodeURIComponent(JSON.stringify({action,...body}));
+  const fullUrl = url + '?action=' + action + '&payload=' + payload;
+
+  const res = await fetch(fullUrl, {
+    method: 'GET',
+    redirect: 'follow',
   });
-  const data=await res.json();
+  const data = await res.json();
   if(!data.ok && data.error) throw new Error(data.error);
   return data;
 }
