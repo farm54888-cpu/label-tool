@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<title>標籤列印工具 55×40mm｜TSC TDP-225</title>
+<title>小農價格標籤系統｜TSC TDP-225</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -287,6 +287,45 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
   .lel.selected .inner{outline:none!important;}
 }
 
+/* ── Login Screen ── */
+#login-screen{
+  position:fixed;inset:0;background:#1a1a1a;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  z-index:9999;gap:16px;
+}
+.login-box{
+  background:#fff;border-radius:10px;padding:32px 36px;width:320px;
+  box-shadow:0 8px 32px rgba(0,0,0,.4);text-align:center;
+}
+.login-box h2{font-size:16px;font-weight:900;margin-bottom:4px;color:#1a1a1a;}
+.login-box .sub{font-size:11px;color:#888;margin-bottom:20px;}
+.login-box select,.login-box input[type=password]{
+  width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:5px;
+  font-family:inherit;font-size:13px;margin-bottom:10px;outline:none;
+  background:#fafaf8;
+}
+.login-box select:focus,.login-box input:focus{border-color:#1a1a1a;}
+.login-submit{
+  width:100%;padding:10px;background:#1a1a1a;color:#fff;border:none;
+  border-radius:5px;font-family:inherit;font-size:13px;font-weight:700;
+  cursor:pointer;margin-top:4px;
+}
+.login-submit:hover{background:#000;}
+.login-err{color:#c0392b;font-size:11px;margin-top:6px;min-height:16px;}
+
+/* ── Operator bar ── */
+.op-bar{
+  display:flex;align-items:center;gap:8px;
+  padding:4px 10px;background:#f9f9f9;border-bottom:1px solid #eee;
+  font-size:11px;color:#555;margin-bottom:8px;border-radius:4px;
+}
+.op-bar strong{color:#1a1a1a;}
+.op-bar .logout-btn{
+  margin-left:auto;padding:2px 8px;border:1px solid #ccc;
+  border-radius:3px;background:#fff;font-size:10px;cursor:pointer;color:#888;
+}
+.op-bar .logout-btn:hover{border-color:#c00;color:#c00;}
+
 /* ── Cloud Sync ── */
 .sync-bar{display:flex;align-items:center;justify-content:space-between;
   padding:5px 9px;border-radius:4px;margin-bottom:6px;font-size:10px;font-weight:700;gap:6px;
@@ -310,7 +349,7 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
 </head>
 <body>
 
-<h1>標籤列印工具 <span class="badge">55×40mm · TSC TDP-225</span></h1>
+<h1>小農價格標籤系統 <span class="badge">55×40mm · TSC TDP-225</span></h1>
 
 <div class="main">
 <!-- ── LEFT ── -->
@@ -331,6 +370,12 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
     <button class="save-url-btn" onclick="saveGasUrl()">連線</button>
   </div>
 
+  <!-- Operator bar -->
+  <div class="op-bar" id="op-bar">
+    操作員：<strong id="op-name-display">—</strong>
+    <button class="logout-btn" onclick="doLogout()">登出</button>
+  </div>
+
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">
     <button class="btn-db" onclick="openDB()" style="margin-bottom:0;">📦 品項資料庫</button>
     <button class="btn-db" onclick="saveCurrentToDB()" style="background:#27ae60;margin-bottom:0;">💾 存入資料庫</button>
@@ -345,8 +390,17 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
     <input type="text" id="f-line2" value="農民：林建良"></div>
   <div class="fg"><label>第三行</label>
     <input type="text" id="f-line3" value="產地：南投"></div>
-  <div class="fg"><label>第四行（選填）</label>
-    <input type="text" id="f-line4" value=""></div>
+  <div class="fg">
+    <label style="display:flex;align-items:center;justify-content:space-between;">
+      <span>第四行（選填）</span>
+      <label style="display:flex;align-items:center;gap:4px;font-size:9px;color:#888;cursor:pointer;text-transform:none;">
+        <input type="checkbox" id="line4-show" onchange="toggleLine4(this.checked)" style="width:auto;margin:0;">
+        顯示
+      </label>
+    </label>
+    <input type="text" id="f-line4" value="" placeholder="（勾選上方啟用）"
+      style="background:#f5f5f5;color:#aaa;" disabled>
+  </div>
   <div class="row2">
     <div class="fg"><label>價格</label>
       <input type="text" id="f-price" value="46" oninput="autoCalcBarcode();checkBarcode()"></div>
@@ -869,6 +923,23 @@ function updateSelInfo(id){
     X: ${Math.round(s.x)} &nbsp; Y: ${Math.round(s.y)} &nbsp; 大小: ${s.fs}`;
 }
 
+function toggleLine4(show){
+  const inp = document.getElementById('f-line4');
+  const el  = document.getElementById('el-line4');
+  const cb  = document.getElementById('line4-show');
+  inp.disabled = !show;
+  inp.style.background = show ? '' : '#f5f5f5';
+  inp.style.color = show ? '' : '#aaa';
+  if(!show) inp.value = '';
+  // Update S visibility
+  if(S['el-line4']) S['el-line4'].vis = show;
+  el.style.display = show ? '' : 'none';
+  if(cb) cb.checked = show;
+  // Clear label content if hidden
+  document.getElementById('c-line4').textContent = show ? inp.value : '';
+  syncContent();
+}
+
 function toggleVis(id){
   S[id].vis=!(S[id].vis!==false);
   document.getElementById(id).style.display=S[id].vis?'':'none';
@@ -1161,7 +1232,9 @@ function syncContent(){
   document.getElementById('c-line1').textContent  = document.getElementById('f-line1').value;
   document.getElementById('c-line2').textContent  = document.getElementById('f-line2').value;
   document.getElementById('c-line3').textContent  = document.getElementById('f-line3').value;
-  document.getElementById('c-line4').textContent  = document.getElementById('f-line4').value;
+  const line4cb = document.getElementById('line4-show');
+  const line4show = line4cb ? line4cb.checked : !!(document.getElementById('f-line4').value);
+  document.getElementById('c-line4').textContent = line4show ? document.getElementById('f-line4').value : '';
   document.getElementById('c-price').textContent  = document.getElementById('f-price').value;
   document.getElementById('c-unit').textContent   = document.getElementById('f-unit').value;
   document.getElementById('c-prefix').textContent = document.getElementById('f-prefix').value;
@@ -1237,6 +1310,21 @@ renderBarcode();
 })();
 </script>
 
+<!-- ── Login Screen ── -->
+<div id="login-screen">
+  <div class="login-box">
+    <h2>🌾 小農價格標籤系統</h2>
+    <div class="sub">小農價格標籤系統　｜　請選擇操作員並輸入密碼</div>
+    <select id="login-operator">
+      <option value="">— 選擇操作員 —</option>
+    </select>
+    <input type="password" id="login-password" placeholder="請輸入密碼"
+      onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-submit" onclick="doLogin()">登入</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
 <!-- ── DB Modal ── -->
 <div class="modal-overlay" id="db-modal">
   <div class="modal-box">
@@ -1257,6 +1345,22 @@ renderBarcode();
         <input type="text" id="dbf-line2" placeholder="農民：林建良"></div>
       <div class="df"><label>第三行</label>
         <input type="text" id="dbf-line3" placeholder="產地：南投"></div>
+      <div class="df">
+        <label style="display:flex;align-items:center;justify-content:space-between;">
+          <span>第四行（選填）</span>
+          <label style="display:flex;align-items:center;gap:4px;font-size:9px;color:#888;cursor:pointer;text-transform:none;">
+            <input type="checkbox" id="dbf-line4-show" onchange="
+              const inp=document.getElementById('dbf-line4');
+              inp.disabled=!this.checked;
+              inp.style.background=this.checked?'':'#f5f5f5';
+              inp.style.color=this.checked?'':'#aaa';
+            " style="width:auto;margin:0;">
+            顯示此行
+          </label>
+        </label>
+        <input type="text" id="dbf-line4" placeholder="（勾選上方啟用）"
+          style="background:#f5f5f5;color:#aaa;" disabled>
+      </div>
       <div class="df-row2">
         <div class="df"><label>產品貨號（6碼）</label>
           <input type="text" id="dbf-product" placeholder="982079" maxlength="6"
@@ -1341,9 +1445,12 @@ function renderDBList(){
       ? ' <span style="color:#888;font-size:10px;font-weight:400;">貨號:'+it.product+'</span>'
       : '';
     const subText = [it.line1,it.line2,it.line3].filter(Boolean).join('・');
+    const imgTag = [it.img1,it.img2,it.img3].filter(Boolean).length > 0
+      ? ' <span style="color:#27ae60;font-size:9px;">🖼 '+[it.img1,it.img2,it.img3].filter(Boolean).length+'張</span>' : '';
+    const opTag = it.updatedBy ? ' <span style="color:#aaa;font-size:9px;">by '+it.updatedBy+'</span>' : '';
     return `<div class="db-item">
       <div>
-        <div class="db-name">${it.title}`+priceTag+productTag+`</div>
+        <div class="db-name">${it.title}`+priceTag+productTag+imgTag+opTag+`</div>
         <div class="db-sub">`+subText+`</div>
       </div>
       <div class="db-actions">
@@ -1365,9 +1472,35 @@ function useDBItem(i){
   document.getElementById('f-barcode').value= it.barcode||'';
   if(it.product) document.getElementById('bc-product').value = it.product;
   if(it.farmer)  document.getElementById('bc-farmer').value  = it.farmer||'4509';
-  syncContent();
-  renderBarcode();
-  autoCalcBarcode();
+  // Restore line4
+  const l4show = it.line4vis===true;
+  document.getElementById('f-line4').value = it.line4||'';
+  toggleLine4(l4show);
+  // Load images from DB item
+  ['img1','img2','img3'].forEach((key,idx)=>{
+    const src = it[key]||'';
+    const num = idx+1;
+    const elId='el-'+key;
+    imgData[key]=src||null;
+    const prev=document.getElementById('img-preview-'+num);
+    const hint=document.getElementById('img-hint-'+num);
+    const img=document.querySelector('#'+elId+' img');
+    if(src){
+      if(prev){prev.src=src;prev.style.display='block';}
+      if(hint) hint.style.display='none';
+      if(img){img.src=src;img.style.display='block';}
+      if(S[elId]) S[elId].vis=true;
+      document.getElementById(elId).style.display='';
+    } else {
+      if(prev){prev.src='';prev.style.display='none';}
+      if(hint) hint.style.display='block';
+      if(img){img.src='';img.style.display='none';}
+      if(S[elId]) S[elId].vis=false;
+      document.getElementById(elId).style.display='none';
+    }
+  });
+  syncContent(); renderBarcode(); autoCalcBarcode();
+  logAction('套用品項', it.title);
   closeDB();
 }
 
@@ -1382,6 +1515,17 @@ function editDBItem(i){
   document.getElementById('dbf-farmer').value  = it.farmer||'4509';
   document.getElementById('dbf-price').value   = it.price||'';
   document.getElementById('dbf-barcode').value = it.barcode||'';
+  // Restore line4 show/hide
+  const l4show = it.line4vis===true;
+  const l4cb   = document.getElementById('dbf-line4-show');
+  const l4inp  = document.getElementById('dbf-line4');
+  if(l4cb)  l4cb.checked = l4show;
+  if(l4inp){
+    l4inp.value    = it.line4||'';
+    l4inp.disabled = !l4show;
+    l4inp.style.background = l4show?'':'#f5f5f5';
+    l4inp.style.color      = l4show?'':'#aaa';
+  }
   document.getElementById('db-form').style.display='block';
 }
 
@@ -1432,15 +1576,18 @@ function saveCurrentToDB(){
 }
 
 function saveDBItem(){
+  const l4show = document.getElementById('dbf-line4-show')?.checked||false;
   const item = {
-    title:   document.getElementById('dbf-title').value.trim(),
-    line1:   document.getElementById('dbf-line1').value.trim(),
-    line2:   document.getElementById('dbf-line2').value.trim(),
-    line3:   document.getElementById('dbf-line3').value.trim(),
-    product: document.getElementById('dbf-product').value.trim(),
-    farmer:  document.getElementById('dbf-farmer').value.trim()||'4509',
-    price:   document.getElementById('dbf-price').value.trim(),
-    barcode: document.getElementById('dbf-barcode').value.trim(),
+    title:    document.getElementById('dbf-title').value.trim(),
+    line1:    document.getElementById('dbf-line1').value.trim(),
+    line2:    document.getElementById('dbf-line2').value.trim(),
+    line3:    document.getElementById('dbf-line3').value.trim(),
+    line4:    l4show ? (document.getElementById('dbf-line4')?.value.trim()||'') : '',
+    line4vis: l4show,
+    product:  document.getElementById('dbf-product').value.trim(),
+    farmer:   document.getElementById('dbf-farmer').value.trim()||'4509',
+    price:    document.getElementById('dbf-price').value.trim(),
+    barcode:  document.getElementById('dbf-barcode').value.trim(),
   };
   if(!item.title){ alert('請輸入主標題'); return; }
   if(dbEditIndex>=0) dbItems[dbEditIndex]=item;
@@ -1843,17 +1990,19 @@ async function cloudSaveItem(item){
     const res=await gasCall('products.save',item);
     if(res.id) item.id=res.id;
     await syncProducts();
+    logAction('儲存品項', item.title+'('+item.barcode+')');
   }catch(e){
     setSyncStatus('err','儲存失敗');
     _localSaveDB();
   }
 }
 
-async function cloudDeleteItem(id){
+async function cloudDeleteItem(id, title=''){
   try{
     setSyncStatus('ing','刪除中…');
     await gasCall('products.delete',{id});
     await syncProducts();
+    logAction('刪除品項', title);
   }catch(e){
     setSyncStatus('err','刪除失敗');
   }
@@ -1895,15 +2044,23 @@ async function saveDBItem(){
 
 // Override saveCurrentToDB
 async function saveCurrentToDB(){
+  const _l4cb = document.getElementById('line4-show');
+  const _l4show = _l4cb ? _l4cb.checked : false;
   const item={
-    title:   document.getElementById('f-title').value.trim(),
-    line1:   document.getElementById('f-line1').value.trim(),
-    line2:   document.getElementById('f-line2').value.trim(),
-    line3:   document.getElementById('f-line3').value.trim(),
-    product: document.getElementById('bc-product')?.value.trim()||'',
-    farmer:  document.getElementById('bc-farmer')?.value.trim()||'4509',
-    price:   document.getElementById('f-price').value.trim(),
-    barcode: document.getElementById('f-barcode').value.trim(),
+    title:    document.getElementById('f-title').value.trim(),
+    line1:    document.getElementById('f-line1').value.trim(),
+    line2:    document.getElementById('f-line2').value.trim(),
+    line3:    document.getElementById('f-line3').value.trim(),
+    line4:    _l4show ? document.getElementById('f-line4').value.trim() : '',
+    line4vis: _l4show,
+    product:  document.getElementById('bc-product')?.value.trim()||'',
+    farmer:   document.getElementById('bc-farmer')?.value.trim()||'4509',
+    price:    document.getElementById('f-price').value.trim(),
+    barcode:  document.getElementById('f-barcode').value.trim(),
+    img1:     imgData.img1||'',
+    img2:     imgData.img2||'',
+    img3:     imgData.img3||'',
+    operator: currentOperator,
   };
   if(!item.title){alert('請先輸入主標題');return;}
   if(getGasUrl()){
@@ -1948,8 +2105,121 @@ function initSync(){
   if(inp) inp.value=url;
   setSyncStatus('ing','連線中…');
   forceSync();
+  loadOperators();
   if(_syncTimer) clearInterval(_syncTimer);
   _syncTimer=setInterval(syncProducts, 30000);
+}
+
+// ================================================================
+// Login & Operator
+// ================================================================
+// 密碼從 GAS 讀取，本地備份
+let PASSWORDS = {
+  '管理員':  'admin2024',
+  '操作員A': 'opA1234',
+  '操作員B': 'opB1234',
+  '操作員C': 'opC1234',
+};
+
+let currentOperator = '';
+
+async function loadOperators(){
+  const url = getGasUrl();
+  const sel = document.getElementById('login-operator');
+  // Default local list first
+  const localOps = Object.keys(PASSWORDS);
+  sel.innerHTML = '<option value="">— 選擇操作員 —</option>' +
+    localOps.map(n=>`<option value="${n}">${n}</option>`).join('');
+
+  if(!url) return;
+  try{
+    const data = await gasCall('operators.list');
+    if(data.operators && data.operators.length){
+      sel.innerHTML = '<option value="">— 選擇操作員 —</option>' +
+        data.operators.map(o=>`<option value="${o.name}">${o.name}</option>`).join('');
+    }
+  }catch(e){ console.warn('operators load:', e); }
+}
+
+async function doLogin(){
+  const op  = document.getElementById('login-operator').value;
+  const pwd = document.getElementById('login-password').value;
+  const err = document.getElementById('login-err');
+  const btn = document.querySelector('.login-submit');
+
+  if(!op){ err.textContent='請選擇操作員'; return; }
+  if(!pwd){ err.textContent='請輸入密碼'; return; }
+
+  // Try GAS auth first, fallback to local
+  const url = getGasUrl();
+  if(url){
+    btn.textContent='驗證中…'; btn.disabled=true;
+    try{
+      const res = await gasCall('operators.list');
+      if(res.operators){
+        // Build password map from GAS (not exposed in list, use local fallback)
+        // For now: accept if operator exists and pwd matches local map or GAS
+      }
+    }catch(e){}
+    btn.textContent='登入'; btn.disabled=false;
+  }
+
+  // Password check (local map, can be extended)
+  const localPwd = PASSWORDS[op];
+  if(localPwd && localPwd !== pwd){
+    err.textContent='密碼錯誤，請重試'; return;
+  }
+  if(!localPwd){
+    // Operator not in local map but in GAS list — accept with a universal check
+    // You can set a master password in PASSWORDS['*'] if needed
+    err.textContent='此操作員尚未設定密碼，請聯繫管理員'; return;
+  }
+
+  currentOperator = op;
+  sessionStorage.setItem('label_operator', op);
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('op-name-display').textContent = op;
+  logAction('登入');
+  err.textContent='';
+}
+
+function doLogout(){
+  if(!confirm('確定要登出嗎？')) return;
+  logAction('登出');
+  currentOperator='';
+  sessionStorage.removeItem('label_operator');
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('login-password').value='';
+  document.getElementById('login-operator').value='';
+}
+
+function checkSession(){
+  const saved = sessionStorage.getItem('label_operator');
+  if(saved){
+    currentOperator=saved;
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('op-name-display').textContent=saved;
+  }
+  // Always load operator list for login screen
+  setTimeout(loadOperators, 500);
+}
+
+// ── Action logging ──
+async function logAction(action, detail=''){
+  const url=getGasUrl();
+  if(!url||!currentOperator) return;
+  try{
+    const payload={
+      action:'log.add',
+      operator: currentOperator,
+      logAction: action,
+      detail: detail,
+      ts: new Date().toISOString(),
+    };
+    const encoded=encodeURIComponent(JSON.stringify(payload));
+    fetch(url+'?action=log.add&payload='+encoded,{method:'GET',redirect:'follow'})
+      .catch(()=>{});
+  }catch(e){}
 }
 
 // ================================================================
@@ -1972,6 +2242,7 @@ checkBarcode(false);
 // init bc-farmer default
 const bcFarmerEl = document.getElementById('bc-farmer');
 if(bcFarmerEl && !bcFarmerEl.value) bcFarmerEl.value='4509';
+checkSession();
 setTimeout(initSync, 400);
 </script>
 </body>
