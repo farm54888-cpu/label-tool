@@ -1765,28 +1765,70 @@ const _origSaveCurrentToDB = saveCurrentToDB;
 // ================================================================
 const imgData = {img1:null, img2:null, img3:null};
 
+// 壓縮圖片並轉 Base64（限制最大 200px，品質 0.75）
+function compressImage(src, maxSize, quality, callback){
+  const img = new Image();
+  img.onload = ()=>{
+    let w = img.width, h = img.height;
+    if(w > maxSize || h > maxSize){
+      if(w > h){ h = Math.round(h * maxSize / w); w = maxSize; }
+      else      { w = Math.round(w * maxSize / h); h = maxSize; }
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    // White background (for PNG with transparency)
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+    const compressed = canvas.toDataURL('image/jpeg', quality);
+    callback(compressed, w, h);
+  };
+  img.src = src;
+}
+
 function loadImg(event, elId, previewId, hintId){
   const file = event.target.files[0];
   if(!file) return;
   const reader = new FileReader();
   reader.onload = e=>{
-    const src = e.target.result;
-    const key = elId.replace('el-','');
-    imgData[key] = src;
-    // Update preview thumbnail in panel
-    const prev=document.getElementById(previewId);
-    const hint=document.getElementById(hintId);
-    prev.src=src; prev.style.display='block'; hint.style.display='none';
-    // Update label element
-    const img=document.querySelector('#'+elId+' img');
-    if(img){ img.src=src; img.style.display='block'; }
-    const s=S[elId]||(S[elId]={x:10,y:150,iw:80,ih:80,vis:true,locked:false});
-    s.vis=true;
-    document.getElementById(elId).style.display='';
-    const i2=document.querySelector('#'+elId+' img');
-    if(i2){i2.style.width=(s.iw||80)+'px';i2.style.height=(s.ih||80)+'px';}
-    // save to localStorage
-    try{ localStorage.setItem('label_img_'+key, src); }catch(e){console.warn('img save failed');}
+    const rawSrc = e.target.result;
+    const key    = elId.replace('el-','');
+    const num    = key.replace('img','');
+    const prev   = document.getElementById(previewId);
+    const hint   = document.getElementById(hintId);
+
+    // Show loading state
+    if(hint){ hint.textContent='壓縮中…'; hint.style.display='block'; }
+    if(prev) prev.style.display='none';
+
+    // Compress: max 200px, quality 0.75
+    compressImage(rawSrc, 200, 0.75, (compressed, cw, ch)=>{
+      const kb = Math.round(compressed.length * 0.75 / 1024);
+      imgData[key] = compressed;
+
+      // Update panel preview
+      if(prev){ prev.src=compressed; prev.style.display='block'; }
+      if(hint){ hint.textContent='✅ '+cw+'×'+ch+'px · '+kb+'KB'; hint.style.display='block'; hint.style.color='#27ae60'; hint.style.fontSize='9px'; }
+
+      // Update label element
+      const imgEl = document.querySelector('#'+elId+' img');
+      if(imgEl){ imgEl.src=compressed; imgEl.style.display='block'; }
+      const s = S[elId]||(S[elId]={x:10,y:150,iw:80,ih:80,vis:true,locked:false});
+      s.vis = true;
+      document.getElementById(elId).style.display='';
+      const i2 = document.querySelector('#'+elId+' img');
+      if(i2){ i2.style.width=(s.iw||80)+'px'; i2.style.height=(s.ih||80)+'px'; }
+
+      // Save to localStorage
+      try{ localStorage.setItem('label_img_'+key, compressed); }
+      catch(err){ console.warn('img localStorage failed:', err); }
+
+      // Warn if still large
+      if(kb > 30){
+        console.warn('Image '+key+' is '+kb+'KB after compression, may exceed Sheets limit');
+      }
+    });
   };
   reader.readAsDataURL(file);
 }
