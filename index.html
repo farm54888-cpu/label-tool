@@ -2192,36 +2192,49 @@ async function doLogin(){
   if(!op){ err.textContent='請選擇操作員'; return; }
   if(!pwd){ err.textContent='請輸入密碼'; return; }
 
-  // Try GAS auth first, fallback to local
+  btn.textContent='驗證中…'; btn.disabled=true; err.textContent='';
+
   const url = getGasUrl();
   if(url){
-    btn.textContent='驗證中…'; btn.disabled=true;
+    // ── 優先從 GAS 驗證密碼（以 Sheets 為準）──
     try{
-      const res = await gasCall('operators.list');
-      if(res.operators){
-        // Build password map from GAS (not exposed in list, use local fallback)
-        // For now: accept if operator exists and pwd matches local map or GAS
+      const res = await gasCall('operators.verify', {operator: op, password: pwd});
+      btn.textContent='登入'; btn.disabled=false;
+      if(res.ok && res.verified){
+        // GAS 驗證成功
+        currentOperator = op;
+        sessionStorage.setItem('label_operator', op);
+        document.getElementById('login-screen').style.display='none';
+        document.getElementById('op-name-display').textContent = op;
+        logAction('登入');
+        return;
+      } else {
+        err.textContent = res.reason || '密碼錯誤，請重試';
+        return;
       }
-    }catch(e){}
-    btn.textContent='登入'; btn.disabled=false;
+    }catch(e){
+      // GAS 連線失敗，fallback 到本地密碼
+      console.warn('GAS auth failed, fallback to local:', e);
+    }
   }
 
-  // Password check (local map, can be extended)
+  // ── Fallback：本地密碼驗證（離線用）──
+  btn.textContent='登入'; btn.disabled=false;
   const localPwd = PASSWORDS[op];
-  if(localPwd && localPwd !== pwd){
-    err.textContent='密碼錯誤，請重試'; return;
-  }
   if(!localPwd){
-    // Operator not in local map but in GAS list — accept with a universal check
-    // You can set a master password in PASSWORDS['*'] if needed
-    err.textContent='此操作員尚未設定密碼，請聯繫管理員'; return;
+    err.textContent='找不到此操作員，請確認網路連線';
+    return;
+  }
+  if(localPwd !== pwd){
+    err.textContent='密碼錯誤，請重試（離線模式）';
+    return;
   }
 
   currentOperator = op;
   sessionStorage.setItem('label_operator', op);
   document.getElementById('login-screen').style.display='none';
   document.getElementById('op-name-display').textContent = op;
-  logAction('登入');
+  logAction('登入（離線）');
   err.textContent='';
 }
 
