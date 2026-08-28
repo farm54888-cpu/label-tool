@@ -380,7 +380,7 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
     <button class="btn-db" onclick="openDB()" style="margin-bottom:0;">📦 品項資料庫</button>
     <button class="btn-db" onclick="saveCurrentToDB()" style="background:#27ae60;margin-bottom:0;">💾 存入資料庫</button>
   </div>
-  <button class="btn-print" onclick="window.print()" style="margin-top:0;margin-bottom:6px;">🖨 列印標籤</button>
+  <button class="btn-print" onclick="doPrint()" style="margin-top:0;margin-bottom:6px;">🖨 列印標籤</button>
 
   <div class="fg"><label>主標題</label>
     <input type="text" id="f-title" value="夏南瓜（櫛瓜）"></div>
@@ -2257,6 +2257,30 @@ function checkSession(){
   }
   // Always load operator list for login screen
   setTimeout(loadOperators, 500);
+}
+
+// ── Print with logging ──
+function doPrint(){
+  const title   = document.getElementById('f-title')?.value || '（未填）';
+  const barcode = document.getElementById('f-barcode')?.value || '';
+  const price   = document.getElementById('f-price')?.value || '';
+
+  const qtyStr = prompt(
+    '📋 列印確認\n\n品項：' + title + '\n價格：' + price + ' 元\n\n請輸入列印張數：',
+    '1'
+  );
+  if(qtyStr === null) return; // 取消
+  const qty = parseInt(qtyStr);
+  if(isNaN(qty) || qty <= 0){
+    alert('請輸入有效的張數（大於0的整數）');
+    return;
+  }
+
+  // Log before printing
+  const detail = title + ' / ' + qty + '張' + (barcode ? ' / 條碼:' + barcode : '');
+  logAction('列印', detail);
+
+  window.print();
 }
 
 // ── Action logging ──
