@@ -1315,9 +1315,16 @@ renderBarcode();
   <div class="login-box">
     <h2>🌾 小農價格標籤系統</h2>
     <div class="sub">小農價格標籤系統　｜　請選擇操作員並輸入密碼</div>
-    <select id="login-operator">
-      <option value="">— 選擇操作員 —</option>
-    </select>
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:0;">
+      <select id="login-operator" style="flex:1;margin-bottom:0;">
+        <option value="">— 選擇操作員 —</option>
+      </select>
+      <button onclick="loadOperators(true)"
+        style="padding:8px 10px;border:1.5px solid #ddd;border-radius:5px;
+        background:#f5f5f5;cursor:pointer;font-size:12px;white-space:nowrap;flex-shrink:0;"
+        title="重新載入操作員名單">↺</button>
+    </div>
+    <div id="op-load-status" style="font-size:9.5px;color:#888;text-align:left;margin:-4px 0 6px;height:14px;"></div>
     <input type="password" id="login-password" placeholder="請輸入密碼"
       onkeydown="if(event.key==='Enter')doLogin()">
     <button class="login-submit" onclick="doLogin()">登入</button>
@@ -2146,8 +2153,12 @@ function initSync(){
   const inp=document.getElementById('gas-url-input');
   if(inp) inp.value=url;
   setSyncStatus('ing','連線中…');
-  forceSync();
-  loadOperators();
+  forceSync().then(()=>{
+    // After sync completes, reload operators with latest data
+    loadOperators(false);
+  });
+  // Load operators immediately too (may use cached)
+  loadOperators(false);
   if(_syncTimer) clearInterval(_syncTimer);
   _syncTimer=setInterval(syncProducts, 30000);
 }
@@ -2165,22 +2176,37 @@ let PASSWORDS = {
 
 let currentOperator = '';
 
-async function loadOperators(){
+async function loadOperators(showStatus=false){
   const url = getGasUrl();
   const sel = document.getElementById('login-operator');
+  const st  = document.getElementById('op-load-status');
+
   // Default local list first
   const localOps = Object.keys(PASSWORDS);
   sel.innerHTML = '<option value="">— 選擇操作員 —</option>' +
     localOps.map(n=>`<option value="${n}">${n}</option>`).join('');
 
-  if(!url) return;
+  if(!url){
+    if(st) st.textContent = '⚠️ 未連線，使用本地名單';
+    return;
+  }
+
+  if(st) st.textContent = '載入名單中…';
   try{
     const data = await gasCall('operators.list');
     if(data.operators && data.operators.length){
       sel.innerHTML = '<option value="">— 選擇操作員 —</option>' +
         data.operators.map(o=>`<option value="${o.name}">${o.name}</option>`).join('');
+      if(st) st.textContent = '✅ 已載入 ' + data.operators.length + ' 位操作員';
+    } else {
+      if(st) st.textContent = '⚠️ 名單為空，使用本地名單';
     }
-  }catch(e){ console.warn('operators load:', e); }
+  }catch(e){
+    console.warn('operators load:', e);
+    if(st) st.textContent = '⚠️ 載入失敗，使用本地名單';
+  }
+  // Clear status after 3s
+  if(st) setTimeout(()=>{ if(st.textContent.startsWith('✅')) st.textContent=''; }, 3000);
 }
 
 async function doLogin(){
@@ -2255,8 +2281,11 @@ function checkSession(){
     document.getElementById('login-screen').style.display='none';
     document.getElementById('op-name-display').textContent=saved;
   }
-  // Always load operator list for login screen
-  setTimeout(loadOperators, 500);
+  // Load local list immediately, then retry from GAS after connection
+  loadOperators(false);
+  // Retry after GAS likely connected
+  setTimeout(()=>loadOperators(false), 2000);
+  setTimeout(()=>loadOperators(false), 5000);
 }
 
 // ── Print with logging ──
