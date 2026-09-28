@@ -176,8 +176,8 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
 /* Element content styles */
 #c-title{font-weight:900;color:#000;white-space:nowrap;}
 #c-line1,#c-line2,#c-line3,#c-line4{font-weight:400;color:#111;white-space:nowrap;}
-#c-price{font-weight:900;color:#000;white-space:nowrap;}
-#c-unit{font-weight:700;color:#000;white-space:nowrap;}
+#c-price{font-weight:900;color:#000;}
+#c-unit{font-weight:700;color:#000;}
 #c-prefix{
   font-family:'Microsoft JhengHei','微軟正黑體','Noto Sans TC',sans-serif;font-weight:700;
   border:2.5px solid #111;
@@ -346,6 +346,7 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
 .sync-setup .save-url-btn{margin-top:5px;padding:4px 12px;background:#1a1a1a;color:#fff;
   border:none;border-radius:3px;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 
@@ -443,6 +444,24 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
     </div>
   </div>
   <input type="hidden" id="f-prefix" value="97">
+
+  <div class="sec">QR Code 流水號</div>
+  <div style="background:#fff8f0;border:1.5px solid #f0c080;border-radius:5px;padding:9px 10px;margin-bottom:8px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">
+      <div>
+        <div style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">今日流水號</div>
+        <div style="font-size:15px;font-weight:900;color:#e67e22;font-family:monospace;" id="qr-serial-display">—</div>
+      </div>
+      <div style="display:flex;flex-direction:column;justify-content:flex-end;">
+        <button onclick="refreshSerial()" style="padding:4px 8px;border:1px solid #e67e22;border-radius:4px;
+          background:#fff;color:#e67e22;font-size:10px;font-weight:700;cursor:pointer;">↺ 取號</button>
+      </div>
+    </div>
+    <div style="font-size:9px;color:#888;margin-bottom:4px;">QR Code 內容預覽：</div>
+    <div style="font-size:10px;font-family:monospace;background:#fff;border:1px solid #ddd;
+      border-radius:3px;padding:3px 7px;color:#333;word-break:break-all;" id="qr-content-preview">（尚未取號）</div>
+    <div style="font-size:9px;color:#aaa;margin-top:4px;">格式：YYYYMMDD-NNNN｜產品貨號</div>
+  </div>
 
   <div class="sec">圖片（最多3張）</div>
   <!-- Image 1 -->
@@ -549,13 +568,14 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
       <div class="inner" id="c-line4"></div>
       <div class="resize-handle" data-id="el-line4"></div>
     </div>
-    <div class="lel" id="el-price">
-      <div class="inner" id="c-price">46</div>
-      <div class="resize-handle" data-id="el-price"></div>
-    </div>
-    <div class="lel" id="el-unit">
-      <div class="inner" id="c-unit">元</div>
-      <div class="resize-handle" data-id="el-unit"></div>
+    <!-- Price group: price + unit right-aligned together -->
+    <div class="lel" id="el-price-group">
+      <div class="inner" id="c-price-group"
+        style="display:flex;align-items:baseline;gap:2px;white-space:nowrap;">
+        <span id="c-price" style="font-weight:900;color:#000;"></span>
+        <span id="c-unit"  style="font-weight:700;color:#000;"></span>
+      </div>
+      <div class="resize-handle" data-id="el-price-group"></div>
     </div>
     <div class="lel" id="el-prefix">
       <div class="inner" id="c-prefix">97</div>
@@ -581,6 +601,13 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
     <div class="lel lel-img" id="el-img3" style="display:none;">
       <div class="inner" id="c-img3"><img src="" alt="圖片3" style="display:block;"></div>
       <div class="resize-handle" data-id="el-img3"></div>
+    </div>
+    <!-- QR Code element -->
+    <div class="lel" id="el-qr">
+      <div class="inner" id="c-qr">
+        <canvas id="qr-canvas" width="78" height="78"></canvas>
+      </div>
+      <div class="resize-handle" data-id="el-qr"></div>
     </div>
   </div>
 </div>
@@ -719,13 +746,13 @@ const DEFAULTS = {
   'el-line2':  {x:13,  y:124, fs:30, vis:true,  locked:false},
   'el-line3':  {x:13,  y:166, fs:30, vis:true,  locked:false},
   'el-line4':  {x:8,   y:104, fs:14, vis:true,  locked:false},
-  'el-price':  {x:386, y:117, fs:80, vis:true,  locked:false},
-  'el-unit':   {x:486, y:166, fs:33, vis:true,  locked:false},
+  'el-price-group': {x:340, y:117, fs:80, ufs:33, vis:true, locked:false},
   'el-prefix': {x:20,  y:337, fs:31, vis:true,  locked:false, pw:61, ph:50},
   'el-barcode':{x:13,  y:229, fs:16, bd:0.8, bw:500, bh:48, vis:true, locked:false},
   'el-img1':   {x:10,  y:150, iw:80, ih:80, vis:false, locked:false},
   'el-img2':   {x:100, y:150, iw:80, ih:80, vis:false, locked:false},
   'el-img3':   {x:190, y:150, iw:80, ih:80, vis:false, locked:false},
+  'el-qr':     {x:462, y:2,   qw:78, qh:78, vis:true,  locked:false},
 };
 
 const META = {
@@ -734,13 +761,13 @@ const META = {
   'el-line2':  {label:'第二行',    color:'#2980b9', fsMin:8,  fsMax:60},
   'el-line3':  {label:'第三行',    color:'#27ae60', fsMin:8,  fsMax:60},
   'el-line4':  {label:'第四行',    color:'#f39c12', fsMin:8,  fsMax:60},
-  'el-price':  {label:'價格',      color:'#e74c3c', fsMin:30, fsMax:120},
-  'el-unit':   {label:'單位',      color:'#16a085', fsMin:10, fsMax:50},
+  'el-price-group': {label:'價格＋單位', color:'#e74c3c', fsMin:20, fsMax:120, hasUFS:true},
   'el-prefix': {label:'前置方框',  color:'#7f8c8d', fsMin:10, fsMax:40, hasPW:true, hasPH:true},
   'el-barcode':{label:'條碼',      color:'#2c3e50', fsMin:6,  fsMax:40, hasBD:true, hasBW:true, hasBH:true},
   'el-img1':   {label:'圖片 1',    color:'#00897b', hasIW:true, hasIH:true, isImg:true},
   'el-img2':   {label:'圖片 2',    color:'#00897b', hasIW:true, hasIH:true, isImg:true},
   'el-img3':   {label:'圖片 3',    color:'#00897b', hasIW:true, hasIH:true, isImg:true},
+  'el-qr':     {label:'QR Code',   color:'#e67e22', hasQW:true, isQR:true},
 };
 
 // current layout state
@@ -755,9 +782,13 @@ function loadState(){
   // ensure all keys exist
   Object.keys(DEFAULTS).forEach(k=>{
     if(!S[k]) S[k]=JSON.parse(JSON.stringify(DEFAULTS[k]));
-    // ensure locked key exists
     if(S[k].locked===undefined) S[k].locked=false;
   });
+  // Migrate old el-price / el-unit to el-price-group
+  if(S['el-price'] && !S['el-price-group']){
+    S['el-price-group'] = Object.assign({}, DEFAULTS['el-price-group'],
+      {x: S['el-price'].x, y: S['el-price'].y, fs: S['el-price'].fs});
+  }
 }
 
 function saveLayout(){
@@ -789,10 +820,25 @@ function applyEl(id){
   // locked state
   if(s.locked) el.classList.add('locked');
   else el.classList.remove('locked');
+  // price group
+  if(id==='el-price-group'){
+    const s2=S[id];
+    const cp=document.getElementById('c-price');
+    const cu=document.getElementById('c-unit');
+    if(cp) cp.style.fontSize=(s2.fs||80)+'px';
+    if(cu) cu.style.fontSize=(s2.ufs||33)+'px';
+    return;
+  }
   // image size
   if(id.startsWith('el-img')){
     const img=el.querySelector('img');
     if(img){img.style.width=(s.iw||80)+'px';img.style.height=(s.ih||80)+'px';}
+    return;
+  }
+  // QR size
+  if(id==='el-qr'){
+    const c=document.getElementById('qr-canvas');
+    if(c){ c.width=s.qw||78; c.height=s.qh||78; renderQR(); }
     return;
   }
 
@@ -895,7 +941,7 @@ function buildList(){
 function updateAllSliders(){
   Object.keys(META).forEach(id=>{
     const s=S[id];
-    ['x','y','fs','pw','ph','bh'].forEach(k=>{
+    ['x','y','fs','pw','ph','bh','ufs'].forEach(k=>{
       const sl=document.getElementById(`sl-${id}-${k}`);
       const nm=document.getElementById(`nm-${id}-${k}`);
       if(sl&&s[k]!=null){sl.value=s[k];nm.textContent=s[k];}
@@ -1248,7 +1294,7 @@ function syncContent(){
   const line4show = line4cb ? line4cb.checked : !!(document.getElementById('f-line4').value);
   document.getElementById('c-line4').textContent = line4show ? document.getElementById('f-line4').value : '';
   document.getElementById('c-price').textContent  = document.getElementById('f-price').value;
-  document.getElementById('c-unit').textContent   = document.getElementById('f-unit').value;
+  document.getElementById('c-unit').textContent   = ' '+document.getElementById('f-unit').value;
   document.getElementById('c-prefix').textContent = document.getElementById('f-prefix').value;
   // also save content
   const content={
@@ -1314,7 +1360,7 @@ renderBarcode();
 // Set initial z-index order: prefix on top of barcode by default
 (function(){
   const order=['el-title','el-line1','el-line2','el-line3','el-line4',
-               'el-price','el-unit','el-barcode','el-prefix'];
+               'el-price-group','el-barcode','el-prefix','el-qr'];
   order.forEach((id,i)=>{
     const el=document.getElementById(id);
     if(el) el.style.zIndex=i+1;
@@ -1946,6 +1992,97 @@ function checkBarcodeDelay(){
 }
 
 // ================================================================
+// QR Code — serial number + rendering
+// ================================================================
+// Uses qrcodejs via CDN (loaded in <head>)
+let currentSerial = '';
+let currentQRContent = '';
+
+function getTodayStr(){
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return y+m+day;
+}
+
+async function refreshSerial(){
+  const url = getGasUrl();
+  const product = (document.getElementById('bc-product')?.value||'').trim();
+  const today = getTodayStr();
+
+  if(url){
+    try{
+      setSyncStatus('ing','取號中…');
+      const res = await gasCall('serial.next', {date: today});
+      if(res.ok && res.serial){
+        currentSerial = res.serial;
+        updateQRDisplay(product);
+        setSyncStatus('ok','已同步');
+        return;
+      }
+    }catch(e){ console.warn('serial fetch failed:', e); }
+  }
+  // Fallback: local increment
+  const key = 'qr_serial_'+today;
+  let n = parseInt(localStorage.getItem(key)||'0') + 1;
+  localStorage.setItem(key, n);
+  currentSerial = today + '-' + String(n).padStart(4,'0');
+  updateQRDisplay(product);
+}
+
+function updateQRDisplay(product){
+  const prod = product || (document.getElementById('bc-product')?.value||'').trim();
+  currentQRContent = prod ? currentSerial+'|'+prod : currentSerial;
+  document.getElementById('qr-serial-display').textContent = currentSerial;
+  document.getElementById('qr-content-preview').textContent = currentQRContent;
+  localStorage.setItem('qr_last_serial', currentSerial);
+  renderQR();
+}
+
+function renderQR(){
+  const canvas = document.getElementById('qr-canvas');
+  if(!canvas || !currentQRContent) return;
+  const size = S['el-qr']?.qw || 78;
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0,0,size,size);
+  if(typeof QRCode === 'undefined') return;
+  try{
+    // Use QRCode to draw on canvas
+    const el = document.createElement('div');
+    new QRCode(el, {
+      text: currentQRContent,
+      width: size, height: size,
+      colorDark: '#000000',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+    // QRCode lib creates an img inside el
+    const img = el.querySelector('img');
+    if(img){
+      img.onload = ()=>{ ctx.drawImage(img,0,0,size,size); };
+      if(img.complete) ctx.drawImage(img,0,0,size,size);
+    } else {
+      // canvas mode
+      const qc = el.querySelector('canvas');
+      if(qc) ctx.drawImage(qc,0,0,size,size);
+    }
+  }catch(e){ console.warn('QR render:', e); }
+}
+
+// Hook: when bc-product changes, update QR content
+const _origAutoCalc = autoCalcBarcode;
+function autoCalcBarcode(){
+  _origAutoCalc();
+  if(currentSerial){
+    const prod = (document.getElementById('bc-product')?.value||'').trim();
+    updateQRDisplay(prod);
+  }
+}
+
+// ================================================================
 // ☁️ Cloud Sync — Google Apps Script
 // ================================================================
 // ★ 將下方換成你的 Apps Script 部署網址（部署後填入）★
@@ -2322,7 +2459,8 @@ function doPrint(){
   // Log to GAS
   const detail = title + ' / ' + qty + '張' +
     (price ? ' / ' + price + '元' : '') +
-    (barcode ? ' / ' + barcode : '');
+    (barcode ? ' / ' + barcode : '') +
+    (currentSerial ? ' / QR:' + currentSerial : '');
   logAction('列印', detail);
 
   window.print();
@@ -2368,6 +2506,19 @@ const bcFarmerEl = document.getElementById('bc-farmer');
 if(bcFarmerEl && !bcFarmerEl.value) bcFarmerEl.value='4509';
 checkSession();
 setTimeout(initSync, 400);
+// Load QR lib check
+setTimeout(()=>{
+  if(typeof QRCode !== 'undefined'){
+    const today = getTodayStr();
+    const key = 'qr_serial_'+today;
+    // restore last serial if same day
+    const saved = localStorage.getItem('qr_last_serial');
+    if(saved && saved.startsWith(today)){
+      currentSerial = saved;
+      updateQRDisplay();
+    }
+  }
+}, 800);
 </script>
 </body>
 </html>
