@@ -1566,8 +1566,8 @@ function useDBItem(i){
     }
   });
   syncContent(); renderBarcode(); autoCalcBarcode();
+  closeDB(); // close first, then log async
   logAction('套用品項', it.title);
-  closeDB();
 }
 
 function editDBItem(i){
@@ -2504,39 +2504,40 @@ function generateQRDataURL(text, size){
   return new Promise(function(resolve){
     if(typeof QRCode === 'undefined'){ resolve(''); return; }
     try{
+      // Use a hidden canvas directly — most reliable cross-browser
       const tmp = document.createElement('div');
-      tmp.style.cssText = 'position:absolute;left:-9999px;';
+      tmp.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:'+size+'px;height:'+size+'px;';
       document.body.appendChild(tmp);
-      new QRCode(tmp, {
-        text: text, width: size, height: size,
+      const qr = new QRCode(tmp, {
+        text: text,
+        width: size, height: size,
         colorDark: '#000000', colorLight: '#ffffff',
         correctLevel: QRCode.CorrectLevel.M,
       });
-      // QRCode lib renders either img or canvas
-      const img = tmp.querySelector('img');
-      const qc  = tmp.querySelector('canvas');
-      if(img){
-        if(img.complete){
-          const c = document.createElement('canvas');
-          c.width=size; c.height=size;
-          c.getContext('2d').drawImage(img,0,0,size,size);
-          resolve(c.toDataURL('image/png'));
-          tmp.remove();
-        } else {
-          img.onload = function(){
-            const c = document.createElement('canvas');
-            c.width=size; c.height=size;
-            c.getContext('2d').drawImage(img,0,0,size,size);
-            resolve(c.toDataURL('image/png'));
+      // Wait one tick for QRCode to render
+      setTimeout(function(){
+        try{
+          const qc = tmp.querySelector('canvas');
+          const im = tmp.querySelector('img');
+          if(qc){
+            resolve(qc.toDataURL('image/png'));
             tmp.remove();
-          };
-        }
-      } else if(qc){
-        resolve(qc.toDataURL('image/png'));
-        tmp.remove();
-      } else {
-        resolve(''); tmp.remove();
-      }
+          } else if(im){
+            // img mode — wait for load
+            function finish(){
+              const c = document.createElement('canvas');
+              c.width=size; c.height=size;
+              c.getContext('2d').drawImage(im,0,0,size,size);
+              resolve(c.toDataURL('image/png'));
+              tmp.remove();
+            }
+            if(im.complete && im.naturalWidth>0){ finish(); }
+            else { im.onload=finish; im.onerror=function(){ resolve(''); tmp.remove(); }; }
+          } else {
+            resolve(''); tmp.remove();
+          }
+        }catch(e2){ console.warn('QR inner:', e2); resolve(''); tmp.remove(); }
+      }, 100);
     }catch(e){ console.warn('QR gen:', e); resolve(''); }
   });
 }
@@ -2623,14 +2624,14 @@ async function printWithSerials(serials, product, qty){
     '#_print_pages{ display:none; }',
   ].join('\n');
 
-  // All QRs are pre-rendered as img — print immediately
+  // All QRs are pre-rendered — slight delay for img paint
   setTimeout(function(){
     window.print();
     setTimeout(function(){
       container.remove();
       printStyle.textContent = '';
-    }, 2000);
-  }, 300);
+    }, 3000);
+  }, 500);
 }
 
 // ── Action logging ──
