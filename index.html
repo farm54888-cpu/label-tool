@@ -2500,86 +2500,123 @@ async function doPrint(){
 }
 
 function printWithSerials(serials, product, qty){
-  // Build a print-only page with qty label copies, each unique QR
-  const shellEl = document.getElementById('shell');
-  const shellHTML = shellEl.innerHTML;
+  // Strategy: inject a hidden multi-page print container into THIS page
+  // so it inherits all fonts, CSS, and element styles exactly
+  const canvas = document.getElementById('qr-canvas');
+  const qrSize = S['el-qr']?.qw || 78;
 
-  // Collect current label styles
-  const labelItems = [];
-  Object.keys(S).forEach(id=>{
-    const el = document.getElementById(id);
-    if(!el || S[id].vis===false) return;
-    labelItems.push({id, style: el.getAttribute('style')||''});
-  });
+  // Remove any previous print container
+  const old = document.getElementById('_print_pages');
+  if(old) old.remove();
 
-  // Generate pages
-  let pages = '';
-  serials.forEach((serial,i)=>{
+  // Build container with one copy per serial
+  const container = document.createElement('div');
+  container.id = '_print_pages';
+
+  serials.forEach(function(serial, i){
     const qrContent = product ? serial+'|'+product : serial;
-    pages += `<div class="label-page" data-serial="${serial}" data-qrcontent="${qrContent}">
-      ${shellHTML}
-    </div>`;
+    const page = document.createElement('div');
+    page.className = '_print_label';
+
+    // Clone the shell exactly
+    const shellClone = document.getElementById('shell').cloneNode(true);
+    shellClone.id = '_shell_clone_'+i;
+    shellClone.style.cssText = [
+      'position:relative',
+      'width:550px',
+      'height:400px',
+      'overflow:hidden',
+      'background:#fff',
+      'border:none',
+      'box-shadow:none',
+      'background-image:none',
+    ].join(';');
+
+    // Remove guideline overlays and handles from clone
+    shellClone.querySelectorAll('.guideline,.resize-handle,.bc-drag-handle').forEach(function(el){
+      el.remove();
+    });
+    // Remove selected outlines
+    shellClone.querySelectorAll('.selected').forEach(function(el){
+      el.classList.remove('selected');
+    });
+    // Remove locked outlines
+    shellClone.querySelectorAll('.locked').forEach(function(el){
+      el.classList.remove('locked');
+    });
+
+    // Render unique QR for this serial
+    const cloneCanvas = shellClone.querySelector('#qr-canvas');
+    if(cloneCanvas && qrContent && typeof QRCode !== 'undefined'){
+      // Give unique id to avoid conflicts
+      const cid = '_qr_clone_'+i;
+      cloneCanvas.id = cid;
+      cloneCanvas.width = qrSize;
+      cloneCanvas.height = qrSize;
+      try{
+        const tmp = document.createElement('div');
+        new QRCode(tmp, {
+          text: qrContent,
+          width: qrSize, height: qrSize,
+          colorDark: '#000000', colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.M,
+        });
+        const tmpImg = tmp.querySelector('img');
+        const tmpQC  = tmp.querySelector('canvas');
+        const ctx = cloneCanvas.getContext('2d');
+        if(tmpImg){
+          if(tmpImg.complete){ ctx.drawImage(tmpImg, 0, 0, qrSize, qrSize); }
+          else { tmpImg.onload = function(){ ctx.drawImage(tmpImg,0,0,qrSize,qrSize); }; }
+        } else if(tmpQC){
+          ctx.drawImage(tmpQC, 0, 0, qrSize, qrSize);
+        }
+      }catch(e){ console.warn('QR clone error:', e); }
+    }
+
+    page.appendChild(shellClone);
+    container.appendChild(page);
   });
 
-  const win = window.open('','_blank');
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
-<title>列印 ${qty} 張</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
-<style>
-*{box-sizing:border-box;margin:0;padding:0;}
-body{background:#fff;}
-.label-page{
-  width:550px;height:400px;position:relative;overflow:hidden;
-  page-break-after:always;background:#fff;
-}
-.label-page:last-child{page-break-after:auto;}
-.lel{position:absolute;}
-.lel .inner{display:inline-block;line-height:1.15;}
-@media print{
-  @page{size:55mm 40mm;margin:0;}
-  .label-page{
-    width:55mm;height:40mm;
-    transform:scale(0.378);transform-origin:top left;
-    page-break-after:always;
+  document.body.appendChild(container);
+
+  // Add print-only styles
+  let printStyle = document.getElementById('_multi_print_style');
+  if(!printStyle){
+    printStyle = document.createElement('style');
+    printStyle.id = '_multi_print_style';
+    document.head.appendChild(printStyle);
   }
-}
-</style></head><body>
-<div id="pages">${pages}</div>
-<script>
-(function(){
-  // Apply styles from parent
-  const state = ${JSON.stringify(S)};
-  document.querySelectorAll('.label-page').forEach(function(page){
-    const serial = page.dataset.serial;
-    const qrcontent = page.dataset.qrcontent;
-    // Replace QR canvas
-    const canvas = page.querySelector('#qr-canvas');
-    if(canvas && qrcontent){
-      const size = state['el-qr'] ? (state['el-qr'].qw||78) : 78;
-      canvas.width=size; canvas.height=size;
-      try{
-        const el=document.createElement('div');
-        new QRCode(el,{text:qrcontent,width:size,height:size,colorDark:'#000',colorLight:'#fff',correctLevel:QRCode.CorrectLevel.M});
-        const img=el.querySelector('img');
-        const qc=el.querySelector('canvas');
-        if(img){ img.onload=function(){canvas.getContext('2d').drawImage(img,0,0,size,size);}; if(img.complete) canvas.getContext('2d').drawImage(img,0,0,size,size); }
-        else if(qc){ canvas.getContext('2d').drawImage(qc,0,0,size,size); }
-      }catch(e){}
-    }
-    // Apply positions from state
-    Object.keys(state).forEach(function(id){
-      const el=page.querySelector('#'+id);
-      if(!el) return;
-      const s=state[id];
-      if(s.vis===false){el.style.display='none';return;}
-      el.style.left=(s.x||0)+'px';
-      el.style.top=(s.y||0)+'px';
-    });
-  });
-  setTimeout(function(){ window.print(); }, 1200);
-})();
-<\/script></body></html>`);
-  win.document.close();
+  printStyle.textContent = [
+    '@media print{',
+    '  @page{ size:55mm 40mm; margin:0; }',
+    '  body > *:not(#_print_pages){ display:none !important; }',
+    '  #_print_pages{ display:block !important; }',
+    '  ._print_label{',
+    '    page-break-after: always;',
+    '    page-break-inside: avoid;',
+    '  }',
+    '  ._print_label:last-child{ page-break-after: auto; }',
+    '  ._print_label > div{',
+    '    transform: scale(0.378) !important;',
+    '    transform-origin: top left !important;',
+    '    width: 550px !important;',
+    '    height: 400px !important;',
+    '    position: fixed !important;',
+    '    top: 0 !important; left: 0 !important;',
+    '  }',
+    '}',
+    '#_print_pages{ display:none; }',
+  ].join('\n');
+
+  // Print after QR images render
+  setTimeout(function(){
+    window.print();
+    // Clean up after print dialog closes
+    setTimeout(function(){
+      container.remove();
+      printStyle.textContent = '';
+    }, 2000);
+  }, 800);
 }
 
 // ── Action logging ──
