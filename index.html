@@ -2499,28 +2499,73 @@ async function doPrint(){
   logAction('列印', detail);
 }
 
-function printWithSerials(serials, product, qty){
-  // Strategy: inject a hidden multi-page print container into THIS page
-  // so it inherits all fonts, CSS, and element styles exactly
-  const canvas = document.getElementById('qr-canvas');
+// Generate QR as data URL (PNG) — avoids canvas clone blank issue
+function generateQRDataURL(text, size){
+  return new Promise(function(resolve){
+    if(typeof QRCode === 'undefined'){ resolve(''); return; }
+    try{
+      const tmp = document.createElement('div');
+      tmp.style.cssText = 'position:absolute;left:-9999px;';
+      document.body.appendChild(tmp);
+      new QRCode(tmp, {
+        text: text, width: size, height: size,
+        colorDark: '#000000', colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M,
+      });
+      // QRCode lib renders either img or canvas
+      const img = tmp.querySelector('img');
+      const qc  = tmp.querySelector('canvas');
+      if(img){
+        if(img.complete){
+          const c = document.createElement('canvas');
+          c.width=size; c.height=size;
+          c.getContext('2d').drawImage(img,0,0,size,size);
+          resolve(c.toDataURL('image/png'));
+          tmp.remove();
+        } else {
+          img.onload = function(){
+            const c = document.createElement('canvas');
+            c.width=size; c.height=size;
+            c.getContext('2d').drawImage(img,0,0,size,size);
+            resolve(c.toDataURL('image/png'));
+            tmp.remove();
+          };
+        }
+      } else if(qc){
+        resolve(qc.toDataURL('image/png'));
+        tmp.remove();
+      } else {
+        resolve(''); tmp.remove();
+      }
+    }catch(e){ console.warn('QR gen:', e); resolve(''); }
+  });
+}
+
+async function printWithSerials(serials, product, qty){
   const qrSize = S['el-qr']?.qw || 78;
 
-  // Remove any previous print container
-  const old = document.getElementById('_print_pages');
-  if(old) old.remove();
+  // Pre-generate all QR data URLs first
+  const qrDataURLs = [];
+  for(let i=0; i<serials.length; i++){
+    const qrContent = product ? serials[i]+'|'+product : serials[i];
+    const dataURL = await generateQRDataURL(qrContent, qrSize);
+    qrDataURLs.push(dataURL);
+  }
 
-  // Build container with one copy per serial
+  // Remove any previous print container
+  const oldC = document.getElementById('_print_pages');
+  if(oldC) oldC.remove();
+
   const container = document.createElement('div');
   container.id = '_print_pages';
 
   serials.forEach(function(serial, i){
-    const qrContent = product ? serial+'|'+product : serial;
     const page = document.createElement('div');
     page.className = '_print_label';
 
-    // Clone the shell exactly
+    // Clone shell
     const shellClone = document.getElementById('shell').cloneNode(true);
-    shellClone.id = '_shell_clone_'+i;
+    shellClone.removeAttribute('id');
     shellClone.style.cssText = [
       'position:relative',
       'width:550px',
@@ -2532,45 +2577,20 @@ function printWithSerials(serials, product, qty){
       'background-image:none',
     ].join(';');
 
-    // Remove guideline overlays and handles from clone
-    shellClone.querySelectorAll('.guideline,.resize-handle,.bc-drag-handle').forEach(function(el){
-      el.remove();
-    });
-    // Remove selected outlines
-    shellClone.querySelectorAll('.selected').forEach(function(el){
-      el.classList.remove('selected');
-    });
-    // Remove locked outlines
-    shellClone.querySelectorAll('.locked').forEach(function(el){
-      el.classList.remove('locked');
-    });
+    // Clean up clone
+    shellClone.querySelectorAll('.guideline,.resize-handle,.bc-drag-handle').forEach(function(el){ el.remove(); });
+    shellClone.querySelectorAll('.selected').forEach(function(el){ el.classList.remove('selected'); });
+    shellClone.querySelectorAll('.locked').forEach(function(el){ el.classList.remove('locked'); });
 
-    // Render unique QR for this serial
+    // Replace canvas with <img> using pre-generated data URL
     const cloneCanvas = shellClone.querySelector('#qr-canvas');
-    if(cloneCanvas && qrContent && typeof QRCode !== 'undefined'){
-      // Give unique id to avoid conflicts
-      const cid = '_qr_clone_'+i;
-      cloneCanvas.id = cid;
-      cloneCanvas.width = qrSize;
-      cloneCanvas.height = qrSize;
-      try{
-        const tmp = document.createElement('div');
-        new QRCode(tmp, {
-          text: qrContent,
-          width: qrSize, height: qrSize,
-          colorDark: '#000000', colorLight: '#ffffff',
-          correctLevel: QRCode.CorrectLevel.M,
-        });
-        const tmpImg = tmp.querySelector('img');
-        const tmpQC  = tmp.querySelector('canvas');
-        const ctx = cloneCanvas.getContext('2d');
-        if(tmpImg){
-          if(tmpImg.complete){ ctx.drawImage(tmpImg, 0, 0, qrSize, qrSize); }
-          else { tmpImg.onload = function(){ ctx.drawImage(tmpImg,0,0,qrSize,qrSize); }; }
-        } else if(tmpQC){
-          ctx.drawImage(tmpQC, 0, 0, qrSize, qrSize);
-        }
-      }catch(e){ console.warn('QR clone error:', e); }
+    if(cloneCanvas && qrDataURLs[i]){
+      const img = document.createElement('img');
+      img.src = qrDataURLs[i];
+      img.width  = qrSize;
+      img.height = qrSize;
+      img.style.cssText = 'display:block;width:'+qrSize+'px;height:'+qrSize+'px;';
+      cloneCanvas.parentNode.replaceChild(img, cloneCanvas);
     }
 
     page.appendChild(shellClone);
@@ -2579,7 +2599,7 @@ function printWithSerials(serials, product, qty){
 
   document.body.appendChild(container);
 
-  // Add print-only styles
+  // Print styles
   let printStyle = document.getElementById('_multi_print_style');
   if(!printStyle){
     printStyle = document.createElement('style');
@@ -2591,32 +2611,26 @@ function printWithSerials(serials, product, qty){
     '  @page{ size:55mm 40mm; margin:0; }',
     '  body > *:not(#_print_pages){ display:none !important; }',
     '  #_print_pages{ display:block !important; }',
-    '  ._print_label{',
-    '    page-break-after: always;',
-    '    page-break-inside: avoid;',
-    '  }',
-    '  ._print_label:last-child{ page-break-after: auto; }',
+    '  ._print_label{ page-break-after:always; page-break-inside:avoid; }',
+    '  ._print_label:last-child{ page-break-after:auto; }',
     '  ._print_label > div{',
-    '    transform: scale(0.378) !important;',
-    '    transform-origin: top left !important;',
-    '    width: 550px !important;',
-    '    height: 400px !important;',
-    '    position: fixed !important;',
-    '    top: 0 !important; left: 0 !important;',
+    '    transform:scale(0.378) !important;',
+    '    transform-origin:top left !important;',
+    '    width:550px !important; height:400px !important;',
+    '    position:fixed !important; top:0 !important; left:0 !important;',
     '  }',
     '}',
     '#_print_pages{ display:none; }',
   ].join('\n');
 
-  // Print after QR images render
+  // All QRs are pre-rendered as img — print immediately
   setTimeout(function(){
     window.print();
-    // Clean up after print dialog closes
     setTimeout(function(){
       container.remove();
       printStyle.textContent = '';
     }, 2000);
-  }, 800);
+  }, 300);
 }
 
 // ── Action logging ──
