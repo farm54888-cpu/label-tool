@@ -571,9 +571,9 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
     <!-- Price group: price + unit right-aligned together -->
     <div class="lel" id="el-price-group">
       <div class="inner" id="c-price-group"
-        style="display:flex;align-items:baseline;gap:2px;white-space:nowrap;">
+        style="display:flex;align-items:baseline;gap:2px;white-space:nowrap;flex-direction:row-reverse;">
+        <span id="c-unit"  style="font-weight:700;color:#000;flex-shrink:0;"></span>
         <span id="c-price" style="font-weight:900;color:#000;"></span>
-        <span id="c-unit"  style="font-weight:700;color:#000;"></span>
       </div>
       <div class="resize-handle" data-id="el-price-group"></div>
     </div>
@@ -746,7 +746,7 @@ const DEFAULTS = {
   'el-line2':  {x:13,  y:124, fs:30, vis:true,  locked:false},
   'el-line3':  {x:13,  y:166, fs:30, vis:true,  locked:false},
   'el-line4':  {x:8,   y:104, fs:14, vis:true,  locked:false},
-  'el-price-group': {x:340, y:117, fs:80, ufs:33, vis:true, locked:false},
+  'el-price-group': {x:350, y:120, fs:80, ufs:28, vis:true, locked:false},
   'el-prefix': {x:20,  y:337, fs:31, vis:true,  locked:false, pw:61, ph:50},
   'el-barcode':{x:13,  y:229, fs:16, bd:0.8, bw:500, bh:48, vis:true, locked:false},
   'el-img1':   {x:10,  y:150, iw:80, ih:80, vis:false, locked:false},
@@ -923,6 +923,7 @@ function buildList(){
       S[id].fs=v;
       if(id==='el-prefix'){document.getElementById('c-prefix').style.fontSize=v+'px';}
       else if(id==='el-barcode'){renderBarcode();}
+      else if(id==='el-price-group'){document.getElementById('c-price').style.fontSize=v+'px';}
       else{const inn=document.getElementById(id).querySelector('.inner');if(inn)inn.style.fontSize=v+'px';}
     });
     if(m.hasPW) addSlider('框寬','pw', 20, 150, s.pw, v=>{S[id].pw=v;document.getElementById('c-prefix').style.width=v+'px';});
@@ -1294,7 +1295,7 @@ function syncContent(){
   const line4show = line4cb ? line4cb.checked : !!(document.getElementById('f-line4').value);
   document.getElementById('c-line4').textContent = line4show ? document.getElementById('f-line4').value : '';
   document.getElementById('c-price').textContent  = document.getElementById('f-price').value;
-  document.getElementById('c-unit').textContent   = ' '+document.getElementById('f-unit').value;
+  document.getElementById('c-unit').textContent   = document.getElementById('f-unit').value;
   document.getElementById('c-prefix').textContent = document.getElementById('f-prefix').value;
   // also save content
   const content={
@@ -2443,10 +2444,11 @@ function checkSession(){
 }
 
 // ── Print with logging ──
-function doPrint(){
+async function doPrint(){
   const title   = document.getElementById('f-title')?.value || '（未填）';
   const barcode = document.getElementById('f-barcode')?.value || '';
   const price   = document.getElementById('f-price')?.value || '';
+  const product = document.getElementById('bc-product')?.value.trim() || '';
   const qtyInput = document.getElementById('f-print-qty');
   const qty = parseInt(qtyInput?.value || '1');
 
@@ -2456,14 +2458,128 @@ function doPrint(){
     return;
   }
 
-  // Log to GAS
+  // If QR is visible and we have a product code, generate serial range
+  const qrVisible = S['el-qr']?.vis !== false;
+  let serials = [];
+
+  if(qrVisible && product){
+    // Get qty consecutive serials from GAS
+    const url = getGasUrl();
+    const today = getTodayStr();
+    setSyncStatus('ing', '取號中…');
+    try{
+      const res = await gasCall('serial.batch', {date: today, qty: qty});
+      if(res.ok && res.serials) serials = res.serials;
+    }catch(e){
+      // Fallback: local serial
+      const key = 'qr_serial_'+today;
+      let n = parseInt(localStorage.getItem(key)||'0');
+      for(let i=0;i<qty;i++){ n++; serials.push(today+'-'+String(n).padStart(4,'0')); }
+      localStorage.setItem(key, n);
+    }
+    setSyncStatus('ok','已取號');
+  }
+
+  // Build print window with qty copies, each with unique QR
+  if(serials.length > 0){
+    printWithSerials(serials, product, qty);
+  } else {
+    // No QR or no product: just print normally
+    window.print();
+  }
+
+  // Log
+  const firstSerial = serials[0] || currentSerial || '';
+  const lastSerial  = serials[serials.length-1] || '';
+  const serialRange = serials.length > 1 ? firstSerial+'～'+lastSerial : firstSerial;
   const detail = title + ' / ' + qty + '張' +
     (price ? ' / ' + price + '元' : '') +
     (barcode ? ' / ' + barcode : '') +
-    (currentSerial ? ' / QR:' + currentSerial : '');
+    (serialRange ? ' / QR:' + serialRange : '');
   logAction('列印', detail);
+}
 
-  window.print();
+function printWithSerials(serials, product, qty){
+  // Build a print-only page with qty label copies, each unique QR
+  const shellEl = document.getElementById('shell');
+  const shellHTML = shellEl.innerHTML;
+
+  // Collect current label styles
+  const labelItems = [];
+  Object.keys(S).forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el || S[id].vis===false) return;
+    labelItems.push({id, style: el.getAttribute('style')||''});
+  });
+
+  // Generate pages
+  let pages = '';
+  serials.forEach((serial,i)=>{
+    const qrContent = product ? serial+'|'+product : serial;
+    pages += `<div class="label-page" data-serial="${serial}" data-qrcontent="${qrContent}">
+      ${shellHTML}
+    </div>`;
+  });
+
+  const win = window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>列印 ${qty} 張</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#fff;}
+.label-page{
+  width:550px;height:400px;position:relative;overflow:hidden;
+  page-break-after:always;background:#fff;
+}
+.label-page:last-child{page-break-after:auto;}
+.lel{position:absolute;}
+.lel .inner{display:inline-block;line-height:1.15;}
+@media print{
+  @page{size:55mm 40mm;margin:0;}
+  .label-page{
+    width:55mm;height:40mm;
+    transform:scale(0.378);transform-origin:top left;
+    page-break-after:always;
+  }
+}
+</style></head><body>
+<div id="pages">${pages}</div>
+<script>
+(function(){
+  // Apply styles from parent
+  const state = ${JSON.stringify(S)};
+  document.querySelectorAll('.label-page').forEach(function(page){
+    const serial = page.dataset.serial;
+    const qrcontent = page.dataset.qrcontent;
+    // Replace QR canvas
+    const canvas = page.querySelector('#qr-canvas');
+    if(canvas && qrcontent){
+      const size = state['el-qr'] ? (state['el-qr'].qw||78) : 78;
+      canvas.width=size; canvas.height=size;
+      try{
+        const el=document.createElement('div');
+        new QRCode(el,{text:qrcontent,width:size,height:size,colorDark:'#000',colorLight:'#fff',correctLevel:QRCode.CorrectLevel.M});
+        const img=el.querySelector('img');
+        const qc=el.querySelector('canvas');
+        if(img){ img.onload=function(){canvas.getContext('2d').drawImage(img,0,0,size,size);}; if(img.complete) canvas.getContext('2d').drawImage(img,0,0,size,size); }
+        else if(qc){ canvas.getContext('2d').drawImage(qc,0,0,size,size); }
+      }catch(e){}
+    }
+    // Apply positions from state
+    Object.keys(state).forEach(function(id){
+      const el=page.querySelector('#'+id);
+      if(!el) return;
+      const s=state[id];
+      if(s.vis===false){el.style.display='none';return;}
+      el.style.left=(s.x||0)+'px';
+      el.style.top=(s.y||0)+'px';
+    });
+  });
+  setTimeout(function(){ window.print(); }, 1200);
+})();
+<\/script></body></html>`);
+  win.document.close();
 }
 
 // ── Action logging ──
