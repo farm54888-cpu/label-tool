@@ -972,6 +972,14 @@ function selectEl(id){
   document.getElementById('row-'+id)?.classList.add('active');
   document.getElementById('row-'+id)?.scrollIntoView({block:'nearest'});
   updateSelInfo(id);
+  // Keep prefix always above barcode (unless prefix itself is selected)
+  if(id !== 'el-prefix'){
+    const prefix = document.getElementById('el-prefix');
+    if(prefix && id === 'el-barcode'){
+      // barcode just got zCounter, give prefix zCounter+1
+      prefix.style.zIndex = zCounter + 1;
+    }
+  }
 }
 
 function updateSelInfo(id){
@@ -1358,14 +1366,19 @@ buildList();
 syncContent();
 applyAll();
 renderBarcode();
-// Set initial z-index order: prefix on top of barcode by default
+// Set initial z-index order
+// el-prefix always on top of barcode (fixed high z-index)
 (function(){
   const order=['el-title','el-line1','el-line2','el-line3','el-line4',
-               'el-price-group','el-barcode','el-prefix','el-qr'];
+               'el-price-group','el-qr','el-img1','el-img2','el-img3',
+               'el-barcode','el-prefix'];
   order.forEach((id,i)=>{
     const el=document.getElementById(id);
-    if(el) el.style.zIndex=i+1;
+    if(el) el.style.zIndex=i+2;
   });
+  // prefix always stays above barcode permanently
+  const prefix = document.getElementById('el-prefix');
+  if(prefix) prefix.style.zIndex = 99;
 })();
 </script>
 
@@ -1484,11 +1497,17 @@ function saveDB(){
 
 function openDB(){
   renderDBList();
-  document.getElementById('db-modal').classList.add('open');
+  const modal = document.getElementById('db-modal');
+  modal.style.display = '';
+  modal.classList.add('open');
   cancelDBForm();
 }
 function closeDB(){
-  document.getElementById('db-modal').classList.remove('open');
+  const modal = document.getElementById('db-modal');
+  modal.classList.remove('open');
+  modal.style.display = 'none';
+  // Force reflow to ensure it's hidden
+  setTimeout(function(){ modal.style.display = ''; }, 50);
 }
 
 function renderDBList(){
