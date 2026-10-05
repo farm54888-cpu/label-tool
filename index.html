@@ -416,7 +416,7 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
   </div>
   <div class="row2">
     <div class="fg"><label>價格</label>
-      <input type="text" id="f-price" value="46" oninput="syncContent();checkBarcode(false)"></div>
+      <input type="text" id="f-price" value="46" oninput="syncContent();autoCalcBarcode();setTimeout(function(){checkBarcode(false);},50)"></div>
     <div class="fg"><label>單位</label>
       <input type="text" id="f-unit" value="元" oninput="syncContent()"></div>
   </div>
@@ -501,7 +501,7 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
       <div class="fg" style="margin-bottom:0;">
         <label>產品貨號（6碼）</label>
         <input type="text" id="bc-product" maxlength="6" placeholder="982079"
-          oninput="this.value=this.value.replace(/\D/g,'');autoCalcBarcode();checkBarcode()">
+          oninput="this.value=this.value.replace(/\D/g,'');autoCalcBarcode();setTimeout(function(){checkBarcode(false);},50)">
       </div>
       <div class="fg" style="margin-bottom:0;">
         <label>農友廠編（4碼，固定）</label>
@@ -1980,6 +1980,7 @@ document.querySelectorAll('.lel-img .resize-handle').forEach(h=>{
 // ================================================================
 let _bcCheckTimer = null;
 function checkBarcode(showAlert){
+  const barcode = (document.getElementById('f-barcode')?.value||'').trim();
   const product = (document.getElementById('bc-product')?.value||'').trim();
   const farmer  = (document.getElementById('bc-farmer')?.value||'4509').trim();
   const price   = (document.getElementById('f-price')?.value||'').trim();
@@ -1988,27 +1989,23 @@ function checkBarcode(showAlert){
   const expEl   = document.getElementById('bc-expected');
   if(!okEl||!errEl) return;
 
-  // If product/farmer/price all filled, auto-calculate and update f-barcode
-  if(product && product.length===6 && farmer && farmer.length===4 && price && !isNaN(parseInt(price))){
-    const priceInt = parseInt(price);
-    const expected = calcBarcode(product, farmer, priceInt);
-    if(expected){
-      // Always update f-barcode to match calculation
-      const barcodeInput = document.getElementById('f-barcode');
-      if(barcodeInput) barcodeInput.value = expected;
-      renderBarcode();
-      okEl.style.display='block'; errEl.style.display='none';
-      return;
-    }
+  // Need all fields to verify
+  if(!product||product.length!==6||!farmer||farmer.length!==4||!price||!barcode||barcode.length!==18){
+    okEl.style.display='none'; errEl.style.display='none'; return;
   }
+  const priceInt=parseInt(price);
+  if(isNaN(priceInt)){ okEl.style.display='none'; errEl.style.display='none'; return; }
+  const expected=calcBarcode(product,farmer,priceInt);
+  if(!expected){ okEl.style.display='none'; errEl.style.display='none'; return; }
 
-  // If only f-barcode is manually filled (no product/farmer), just validate length
-  const barcode = (document.getElementById('f-barcode')?.value||'').trim();
-  if(!barcode || barcode.length !== 18){
-    okEl.style.display='none'; errEl.style.display='none';
+  if(barcode===expected){
+    okEl.style.display='block'; errEl.style.display='none';
   } else {
-    // Can't verify without product/farmer, just show neutral
-    okEl.style.display='none'; errEl.style.display='none';
+    okEl.style.display='none'; errEl.style.display='block';
+    if(expEl) expEl.textContent=expected;
+    if(showAlert){
+      alert('⚠️ 條碼數值不符！\n\n輸入值：' + barcode + '\n正確值：' + expected + '\n\n請確認價格/貨號是否有誤。');
+    }
   }
 }
 
