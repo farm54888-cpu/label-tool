@@ -416,9 +416,9 @@ h1 .badge{font-size:9px;background:var(--dark);color:#fff;padding:2px 7px;border
   </div>
   <div class="row2">
     <div class="fg"><label>價格</label>
-      <input type="text" id="f-price" value="46" oninput="autoCalcBarcode();checkBarcode()"></div>
+      <input type="text" id="f-price" value="46" oninput="syncContent();autoCalcBarcode();checkBarcode()"></div>
     <div class="fg"><label>單位</label>
-      <input type="text" id="f-unit" value="元"></div>
+      <input type="text" id="f-unit" value="元" oninput="syncContent()"></div>
   </div>
   <!-- 前置號碼 = 今年第幾天，可 ±2 天調整 -->
   <div style="background:#f9f6ff;border:1.5px solid #d5c5f0;border-radius:5px;padding:9px 10px;margin-bottom:8px;">
