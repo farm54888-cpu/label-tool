@@ -1666,6 +1666,8 @@ function saveCurrentToDB(){
 
 function saveDBItem(){
   const l4show = document.getElementById('dbf-line4-show')?.checked||false;
+  // Preserve existing images from the original item when editing
+  const existing = (dbEditIndex >= 0 && dbItems[dbEditIndex]) ? dbItems[dbEditIndex] : {};
   const item = {
     title:    document.getElementById('dbf-title').value.trim(),
     line1:    document.getElementById('dbf-line1').value.trim(),
@@ -1677,6 +1679,10 @@ function saveDBItem(){
     farmer:   document.getElementById('dbf-farmer').value.trim()||'4509',
     price:    document.getElementById('dbf-price').value.trim(),
     barcode:  document.getElementById('dbf-barcode').value.trim(),
+    // Preserve images from existing item
+    img1:     existing.img1||'',
+    img2:     existing.img2||'',
+    img3:     existing.img3||'',
   };
   if(!item.title){ alert('請輸入主標題'); return; }
   if(dbEditIndex>=0) dbItems[dbEditIndex]=item;
@@ -2243,16 +2249,25 @@ async function delDBItem(i){
 
 // Override saveDBItem
 async function saveDBItem(){
+  const l4show = document.getElementById('dbf-line4-show')?.checked||false;
+  const existing = (dbEditIndex>=0 && dbItems[dbEditIndex]) ? dbItems[dbEditIndex] : {};
   const item={
     id:      dbEditIndex>=0?(dbItems[dbEditIndex].id||''):'',
     title:   document.getElementById('dbf-title').value.trim(),
     line1:   document.getElementById('dbf-line1').value.trim(),
     line2:   document.getElementById('dbf-line2').value.trim(),
     line3:   document.getElementById('dbf-line3').value.trim(),
+    line4:   l4show?(document.getElementById('dbf-line4')?.value.trim()||''):'',
+    line4vis:l4show,
     product: document.getElementById('dbf-product').value.trim(),
     farmer:  document.getElementById('dbf-farmer').value.trim()||'4509',
     price:   document.getElementById('dbf-price').value.trim(),
     barcode: document.getElementById('dbf-barcode').value.trim(),
+    // Preserve existing images
+    img1:    existing.img1||'',
+    img2:    existing.img2||'',
+    img3:    existing.img3||'',
+    operator: currentOperator,
   };
   if(!item.title){alert('請輸入主標題');return;}
   cancelDBForm();
