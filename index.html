@@ -775,7 +775,7 @@ let S = {}; window.S = S;
 
 function loadState(){
   try{
-    const saved = localStorage.getItem('label_layout_v9');
+    const saved = localStorage.getItem('label_layout_v10');
     if(saved) S = JSON.parse(saved);
     else S = JSON.parse(JSON.stringify(DEFAULTS));
   }catch(e){ S = JSON.parse(JSON.stringify(DEFAULTS)); }
@@ -784,15 +784,19 @@ function loadState(){
     if(!S[k]) S[k]=JSON.parse(JSON.stringify(DEFAULTS[k]));
     if(S[k].locked===undefined) S[k].locked=false;
   });
-  // Migrate old el-price / el-unit to el-price-group
-  if(S['el-price'] && !S['el-price-group']){
-    S['el-price-group'] = Object.assign({}, DEFAULTS['el-price-group'],
-      {x: S['el-price'].x, y: S['el-price'].y, fs: S['el-price'].fs});
+  // Migrate: if old layout has el-price but no el-price-group, reset to DEFAULTS
+  if(S['el-price'] || S['el-unit']){
+    // Old version detected — discard and use fresh defaults
+    S = JSON.parse(JSON.stringify(DEFAULTS));
+  }
+  // Ensure el-price-group exists
+  if(!S['el-price-group']){
+    S['el-price-group'] = JSON.parse(JSON.stringify(DEFAULTS['el-price-group']));
   }
 }
 
 function saveLayout(){
-  localStorage.setItem('label_layout_v9', JSON.stringify(S));
+  localStorage.setItem('label_layout_v10', JSON.stringify(S));
   const n = document.getElementById('saved-notice');
   n.style.display='block';
   setTimeout(()=>n.style.display='none', 2000);
@@ -1038,7 +1042,7 @@ function toggleGlobalLock(){
     btn.textContent = '🔓 版面未鎖定（點擊鎖定）';
     btn.classList.remove('is-locked');
   }
-  localStorage.setItem('label_layout_v9', JSON.stringify(S));
+  localStorage.setItem('label_layout_v10', JSON.stringify(S));
 }
 
 function toggleLock(id){
@@ -1046,7 +1050,7 @@ function toggleLock(id){
   const el=document.getElementById(id);
   if(S[id].locked){ el.classList.add('locked'); if(selectedId===id) selectEl(null); }
   else el.classList.remove('locked');
-  localStorage.setItem('label_layout_v9',JSON.stringify(S));
+  localStorage.setItem('label_layout_v10',JSON.stringify(S));
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1287,7 +1291,7 @@ document.addEventListener('mouseup',()=>{
     clearGuidelines();
     dragState=null;
     // auto-save
-    localStorage.setItem('label_layout_v9',JSON.stringify(S));
+    localStorage.setItem('label_layout_v10',JSON.stringify(S));
   }
 });
 
@@ -1319,11 +1323,11 @@ function syncContent(){
   };
   content.bcProduct = document.getElementById('bc-product')?.value||'';
   content.bcFarmer  = document.getElementById('bc-farmer')?.value||'';
-  localStorage.setItem('label_content_v9',JSON.stringify(content));
+  localStorage.setItem('label_content_v10',JSON.stringify(content));
 }
 function loadContent(){
   try{
-    const saved=localStorage.getItem('label_content_v9');
+    const saved=localStorage.getItem('label_content_v10');
     if(!saved) return;
     const c=JSON.parse(saved);
     if(c.title)  document.getElementById('f-title').value=c.title;
